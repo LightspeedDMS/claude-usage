@@ -433,41 +433,44 @@ class ConsoleAPIClient:
                 return None, error
 
             # Process day's results
+            # Note: claude_code endpoint returns flat list, not wrapped in "results"
             if day_data:
                 for item in day_data:
                     if not isinstance(item, dict):
                         continue
 
-                    results = item.get("results", [])
-                    if not results:
+                    # Extract user email
+                    actor = item.get("actor", {})
+                    email = actor.get("email_address")
+                    if not email:
                         continue
 
-                    for result in results:
-                        if not isinstance(result, dict):
+                    # Extract and sum costs from model breakdown
+                    model_breakdown = item.get("model_breakdown", [])
+                    for model_data in model_breakdown:
+                        if not isinstance(model_data, dict):
                             continue
 
-                        # Extract user email
-                        actor = result.get("actor", {})
-                        email = actor.get("email_address")
-                        if not email:
-                            continue
-
-                        # Extract and sum costs from model breakdown
-                        model_breakdown = result.get("model_breakdown", [])
-                        for model_data in model_breakdown:
-                            if not isinstance(model_data, dict):
-                                continue
-
-                            cost = model_data.get("estimated_cost", 0)
+                        # estimated_cost is {"currency": "USD", "amount": 964} where amount is in cents
+                        estimated_cost = model_data.get("estimated_cost", {})
+                        if isinstance(estimated_cost, dict):
+                            # Real API: amount is in cents
+                            cost_cents = estimated_cost.get("amount", 0)
                             try:
-                                cost_float = float(cost)
+                                cost_dollars = float(cost_cents) / 100.0
+                            except (ValueError, TypeError):
+                                continue
+                        else:
+                            # Test data: direct dollar amount
+                            try:
+                                cost_dollars = float(estimated_cost)
                             except (ValueError, TypeError):
                                 continue
 
-                            # Accumulate by user email
-                            if email not in user_costs:
-                                user_costs[email] = 0.0
-                            user_costs[email] += cost_float
+                        # Accumulate by user email
+                        if email not in user_costs:
+                            user_costs[email] = 0.0
+                        user_costs[email] += cost_dollars
 
             # Move to next day
             current_date += timedelta(days=1)

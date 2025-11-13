@@ -17,21 +17,15 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         mock_date.today.return_value = date(2025, 11, 12)
         mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
 
-        # Mock API response for single day
+        # Mock API response for single day (flat list structure)
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "data": [
                 {
-                    "starting_at": "2025-11-01",
-                    "ending_at": "2025-11-01",
-                    "results": [
-                        {
-                            "actor": {"email_address": "user1@example.com"},
-                            "model_breakdown": [
-                                {"model": "claude-sonnet-4-5", "estimated_cost": 50.25}
-                            ],
-                        }
+                    "actor": {"email_address": "user1@example.com"},
+                    "model_breakdown": [
+                        {"model": "claude-sonnet-4-5", "estimated_cost": 50.25}
                     ],
                 }
             ],
@@ -42,9 +36,7 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         admin_key = "sk-ant-admin-test-key-12345"
         client = ConsoleAPIClient(admin_key)
 
-        result, error = client.fetch_claude_code_user_usage(
-            "2025-11-01", "2025-11-01"
-        )
+        result, error = client.fetch_claude_code_user_usage("2025-11-01", "2025-11-01")
 
         # Verify result format
         self.assertIsNone(error)
@@ -62,7 +54,7 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         mock_date.today.return_value = date(2025, 11, 12)
         mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
 
-        # Mock API responses for two days
+        # Mock API responses for two days (flat list structure)
         responses = [
             # Day 1: 2025-11-01
             Mock(
@@ -71,17 +63,11 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
                     return_value={
                         "data": [
                             {
-                                "starting_at": "2025-11-01",
-                                "ending_at": "2025-11-01",
-                                "results": [
+                                "actor": {"email_address": "user1@example.com"},
+                                "model_breakdown": [
                                     {
-                                        "actor": {"email_address": "user1@example.com"},
-                                        "model_breakdown": [
-                                            {
-                                                "model": "claude-sonnet-4-5",
-                                                "estimated_cost": 50.0,
-                                            }
-                                        ],
+                                        "model": "claude-sonnet-4-5",
+                                        "estimated_cost": 50.0,
                                     }
                                 ],
                             }
@@ -97,17 +83,11 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
                     return_value={
                         "data": [
                             {
-                                "starting_at": "2025-11-02",
-                                "ending_at": "2025-11-02",
-                                "results": [
+                                "actor": {"email_address": "user1@example.com"},
+                                "model_breakdown": [
                                     {
-                                        "actor": {"email_address": "user1@example.com"},
-                                        "model_breakdown": [
-                                            {
-                                                "model": "claude-sonnet-4-5",
-                                                "estimated_cost": 75.0,
-                                            }
-                                        ],
+                                        "model": "claude-sonnet-4-5",
+                                        "estimated_cost": 75.0,
                                     }
                                 ],
                             }
@@ -122,9 +102,7 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         admin_key = "sk-ant-admin-test-key-12345"
         client = ConsoleAPIClient(admin_key)
 
-        result, error = client.fetch_claude_code_user_usage(
-            "2025-11-01", "2025-11-02"
-        )
+        result, error = client.fetch_claude_code_user_usage("2025-11-01", "2025-11-02")
 
         # Verify aggregation across days
         self.assertIsNone(error)
@@ -140,29 +118,23 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         mock_date.today.return_value = date(2025, 11, 12)
         mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
 
-        # Mock API response with multiple users
+        # Mock API response with multiple users (flat list structure)
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "data": [
                 {
-                    "starting_at": "2025-11-01",
-                    "ending_at": "2025-11-01",
-                    "results": [
-                        {
-                            "actor": {"email_address": "user1@example.com"},
-                            "model_breakdown": [
-                                {"model": "claude-sonnet-4-5", "estimated_cost": 50.0}
-                            ],
-                        },
-                        {
-                            "actor": {"email_address": "user2@example.com"},
-                            "model_breakdown": [
-                                {"model": "claude-opus-4", "estimated_cost": 100.0}
-                            ],
-                        },
+                    "actor": {"email_address": "user1@example.com"},
+                    "model_breakdown": [
+                        {"model": "claude-sonnet-4-5", "estimated_cost": 50.0}
                     ],
-                }
+                },
+                {
+                    "actor": {"email_address": "user2@example.com"},
+                    "model_breakdown": [
+                        {"model": "claude-opus-4", "estimated_cost": 100.0}
+                    ],
+                },
             ],
             "has_more": False,
         }
@@ -171,9 +143,7 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         admin_key = "sk-ant-admin-test-key-12345"
         client = ConsoleAPIClient(admin_key)
 
-        result, error = client.fetch_claude_code_user_usage(
-            "2025-11-01", "2025-11-01"
-        )
+        result, error = client.fetch_claude_code_user_usage("2025-11-01", "2025-11-01")
 
         # Verify multiple users
         self.assertIsNone(error)
@@ -202,9 +172,7 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         admin_key = "sk-ant-admin-test-key-12345"
         client = ConsoleAPIClient(admin_key)
 
-        result, error = client.fetch_claude_code_user_usage(
-            "2025-11-01", "2025-11-01"
-        )
+        result, error = client.fetch_claude_code_user_usage("2025-11-01", "2025-11-01")
 
         # Verify error handling
         self.assertIsNone(result)
@@ -228,9 +196,7 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         admin_key = "sk-ant-admin-test-key-12345"
         client = ConsoleAPIClient(admin_key)
 
-        result, error = client.fetch_claude_code_user_usage(
-            "2025-11-01", "2025-11-01"
-        )
+        result, error = client.fetch_claude_code_user_usage("2025-11-01", "2025-11-01")
 
         # Verify empty results handling
         self.assertIsNone(error)

@@ -82,7 +82,8 @@ class TestFetchConsoleData:
             assert monitor.console_org_data == {"id": "org_123", "name": "Test Org"}
             assert monitor.console_workspaces == [{"id": "ws_1", "name": "Workspace 1"}]
             assert monitor.mtd_usage == {"total_tokens": 1000000}
-            assert monitor.mtd_cost == {"total_cost_usd": 50.00}
+            assert monitor.mtd_cost["total_cost_usd"] == 50.00
+            assert "claude_code_users" in monitor.mtd_cost
             # YTD data should NOT exist
             assert not hasattr(monitor, "ytd_usage")
             assert not hasattr(monitor, "ytd_cost")

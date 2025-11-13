@@ -67,7 +67,9 @@ class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
             with patch("claude_usage.monitor.Path.mkdir"):
                 with patch("builtins.open", create=True):
                     with patch("json.load") as mock_json_load:
-                        with patch("claude_usage.monitor.UsageStorage") as mock_storage_class:
+                        with patch(
+                            "claude_usage.monitor.UsageStorage"
+                        ) as mock_storage_class:
                             mock_storage = Mock()
                             mock_storage.store_console_snapshot = Mock()
                             mock_storage_class.return_value = mock_storage
@@ -91,9 +93,12 @@ class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
                             # Verify mtd_cost contains user-specific data
                             self.assertTrue(result)
                             self.assertIsNotNone(monitor.mtd_cost)
-                            self.assertEqual(monitor.mtd_cost["claude_code_user_cost_usd"], 50.0)
                             self.assertEqual(
-                                monitor.mtd_cost["current_user_email"], "user1@example.com"
+                                monitor.mtd_cost["claude_code_user_cost_usd"], 50.0
+                            )
+                            self.assertEqual(
+                                monitor.mtd_cost["current_user_email"],
+                                "user1@example.com",
                             )
 
     @patch("claude_usage.auth.AdminAuthManager")
@@ -149,7 +154,9 @@ class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
             with patch("claude_usage.monitor.Path.mkdir"):
                 with patch("builtins.open", create=True):
                     with patch("json.load") as mock_json_load:
-                        with patch("claude_usage.monitor.UsageStorage") as mock_storage_class:
+                        with patch(
+                            "claude_usage.monitor.UsageStorage"
+                        ) as mock_storage_class:
                             mock_storage = Mock()
                             mock_storage.store_console_snapshot = Mock()
                             mock_storage_class.return_value = mock_storage
@@ -167,9 +174,12 @@ class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
                             # Verify user-specific data is 0.0 when user not found
                             self.assertTrue(result)
                             self.assertIsNotNone(monitor.mtd_cost)
-                            self.assertEqual(monitor.mtd_cost["claude_code_user_cost_usd"], 0.0)
                             self.assertEqual(
-                                monitor.mtd_cost["current_user_email"], "user1@example.com"
+                                monitor.mtd_cost["claude_code_user_cost_usd"], 0.0
+                            )
+                            self.assertEqual(
+                                monitor.mtd_cost["current_user_email"],
+                                "user1@example.com",
                             )
 
 

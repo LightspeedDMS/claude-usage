@@ -331,7 +331,10 @@ class ConsoleRenderer:
         # Claude Code per-user cost if available
         claude_code_user_cost = mtd_data.get("claude_code_user_cost_usd")
         current_user_email = mtd_data.get("current_user_email")
+        claude_code_users = mtd_data.get("claude_code_users", [])
+
         if claude_code_user_cost is not None and current_user_email:
+            # Show current user's cost
             content.append(Text(""))  # spacing
             content.append(
                 Text(
@@ -339,6 +342,18 @@ class ConsoleRenderer:
                     style="cyan",
                 )
             )
+        elif claude_code_users:
+            # Show top users when current user can't be identified
+            content.append(Text(""))  # spacing
+            content.append(Text("Claude Code Usage (Top Users):", style="bold"))
+            # Sort by cost and show top 5
+            sorted_users = sorted(
+                claude_code_users, key=lambda u: u.get("cost_usd", 0), reverse=True
+            )
+            for user in sorted_users[:5]:
+                email = user.get("email", "")
+                cost = user.get("cost_usd", 0)
+                content.append(Text(f"  {email}: {self._format_currency(cost)}"))
         # APPROVED FALLBACK: 2025-11-13 - Legacy Console analytics compatibility during transition
         elif mtd_data.get("claude_code"):
             claude_code = mtd_data.get("claude_code")
