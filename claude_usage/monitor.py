@@ -23,7 +23,7 @@ class ClaudeUsageMonitor:
     """Monitor Claude Code account usage via the discovered API"""
 
     POLL_INTERVAL_CODE = 30  # seconds - for Code mode
-    POLL_INTERVAL_CONSOLE = 120  # seconds - for Console mode (2 minutes)
+    POLL_INTERVAL_CONSOLE = 300  # seconds - for Console mode (5 minutes)
 
     def __init__(self, credentials_path=None):
         if credentials_path is None:
