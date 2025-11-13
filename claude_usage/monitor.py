@@ -89,31 +89,38 @@ class ClaudeUsageMonitor:
             self.error_message = error
 
     def detect_mode(self):
-        """Detect which mode to run in: 'console' or 'code'"""
+        """Detect which mode to run in: 'console' or 'code'
+
+        Priority order:
+        1. Explicit mode field in credentials file (user override)
+        2. Claude Code OAuth credentials (subscription/code mode)
+        3. Anthropic Console Admin API key (console mode)
+        """
         import os
         import json
-
-        # Check environment variable first
-        if os.environ.get("ANTHROPIC_ADMIN_API_KEY"):
-            return "console"
 
         # Check credentials file
         try:
             with open(self.credentials_path) as f:
                 data = json.load(f)
 
-            # Check for explicit mode field override
+            # Check for explicit mode field override (highest priority)
             if "mode" in data and data["mode"] in ["console", "code"]:
                 return data["mode"]
 
-            if "anthropicConsole" in data and "adminApiKey" in data["anthropicConsole"]:
-                return "console"
-
-            # Check for OAuth credentials
+            # Check for Claude Code OAuth credentials (second priority)
             if "claudeCode" in data or "claudeAiOauth" in data:
                 return "code"
+
+            # Check for Anthropic Console Admin API key in file (third priority)
+            if "anthropicConsole" in data and "adminApiKey" in data["anthropicConsole"]:
+                return "console"
         except Exception:
             pass
+
+        # Check environment variable (lowest priority)
+        if os.environ.get("ANTHROPIC_ADMIN_API_KEY"):
+            return "console"
 
         # No credentials found
         self.error_message = "No credentials found"

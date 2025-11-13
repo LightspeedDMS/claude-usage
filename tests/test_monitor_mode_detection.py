@@ -23,8 +23,8 @@ class TestModeDetection(unittest.TestCase):
 
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_detect_mode_console_when_admin_key_in_env(self):
-        """Test that mode is 'console' when ANTHROPIC_ADMIN_API_KEY is set"""
+    def test_detect_mode_code_when_oauth_available_despite_admin_key_in_env(self):
+        """Test that mode is 'code' when OAuth credentials take priority over env var"""
         # Create credentials file with OAuth but no admin key
         credentials_data = {
             "claudeCode": {"accessToken": "test-token", "refreshToken": "test-refresh"}
@@ -38,10 +38,11 @@ class TestModeDetection(unittest.TestCase):
             monitor = ClaudeUsageMonitor(credentials_path=self.credentials_path)
             mode = monitor.detect_mode()
 
-            self.assertEqual(mode, "console")
+            # Code mode takes priority over environment variable
+            self.assertEqual(mode, "code")
 
-    def test_detect_mode_console_when_admin_key_in_file(self):
-        """Test that mode is 'console' when adminApiKey present in credentials file"""
+    def test_detect_mode_code_when_oauth_available_despite_admin_key_in_file(self):
+        """Test that mode is 'code' when OAuth credentials take priority over admin key in file"""
         credentials_data = {
             "claudeCode": {"accessToken": "test-token", "refreshToken": "test-refresh"},
             "anthropicConsole": {"adminApiKey": "sk-ant-admin-test-key"},
@@ -54,7 +55,8 @@ class TestModeDetection(unittest.TestCase):
             monitor = ClaudeUsageMonitor(credentials_path=self.credentials_path)
             mode = monitor.detect_mode()
 
-            self.assertEqual(mode, "console")
+            # Code mode takes priority over admin key in file
+            self.assertEqual(mode, "code")
 
     def test_detect_mode_code_when_only_oauth_available(self):
         """Test that mode is 'code' when only OAuth credentials available"""
@@ -70,6 +72,35 @@ class TestModeDetection(unittest.TestCase):
             mode = monitor.detect_mode()
 
             self.assertEqual(mode, "code")
+
+    def test_detect_mode_console_when_only_admin_key_in_file(self):
+        """Test that mode is 'console' when only admin key in file (no OAuth)"""
+        credentials_data = {
+            "anthropicConsole": {"adminApiKey": "sk-ant-admin-test-key"},
+        }
+        with open(self.credentials_path, "w") as f:
+            json.dump(credentials_data, f)
+
+        with patch.dict(os.environ, {}, clear=True):
+            monitor = ClaudeUsageMonitor(credentials_path=self.credentials_path)
+            mode = monitor.detect_mode()
+
+            self.assertEqual(mode, "console")
+
+    def test_detect_mode_console_when_only_admin_key_in_env(self):
+        """Test that mode is 'console' when only admin key in env (no OAuth)"""
+        # Don't create credentials file with OAuth
+        credentials_data = {}
+        with open(self.credentials_path, "w") as f:
+            json.dump(credentials_data, f)
+
+        with patch.dict(
+            os.environ, {"ANTHROPIC_ADMIN_API_KEY": "sk-ant-admin-test-key"}
+        ):
+            monitor = ClaudeUsageMonitor(credentials_path=self.credentials_path)
+            mode = monitor.detect_mode()
+
+            self.assertEqual(mode, "console")
 
     def test_detect_mode_error_when_no_credentials(self):
         """Test that mode detection returns error when no credentials found"""
