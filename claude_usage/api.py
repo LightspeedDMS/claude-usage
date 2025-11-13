@@ -10,6 +10,7 @@ class ConsoleAPIClient:
     def __init__(self, admin_key):
         self.admin_key = admin_key
         self.base_url = "https://api.anthropic.com"
+        self._current_user_email_cache = None
 
     def _get_headers(self):
         """Return required headers for Console API requests"""
@@ -389,6 +390,131 @@ class ConsoleAPIClient:
             return None, f"Network error: {e}"
         except Exception as e:
             return None, f"Failed to parse response: {e}"
+
+    def fetch_claude_code_user_usage(self, starting_at, ending_at):
+        """Fetch per-user Claude Code usage from Admin API endpoint
+
+        The claude_code endpoint returns single day data only, so we must
+        iterate day-by-day and aggregate results by user email.
+
+        Args:
+            starting_at: Start date in YYYY-MM-DD format
+            ending_at: End date in YYYY-MM-DD format
+
+        Returns:
+            tuple: (dict with {"users": [{"email": str, "cost_usd": float}, ...]}, error_message)
+                   or (None, error_message) on failure
+        """
+        from datetime import datetime, timedelta
+
+        # Parse dates
+        try:
+            start_date = datetime.strptime(starting_at, "%Y-%m-%d").date()
+            end_date = datetime.strptime(ending_at, "%Y-%m-%d").date()
+        except ValueError as e:
+            return None, f"Invalid date format: {e}"
+
+        url = f"{self.base_url}/v1/organizations/usage_report/claude_code"
+        headers = self._get_headers()
+
+        # Aggregate costs by user email across all days
+        user_costs = {}
+
+        # Iterate day by day
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            params = {"starting_at": date_str, "limit": 1000}
+
+            # Fetch single day data using pagination handler
+            day_data, error = self._handle_pagination(url, params, headers)
+
+            if error:
+                return None, error
+
+            # Process day's results
+            if day_data:
+                for item in day_data:
+                    if not isinstance(item, dict):
+                        continue
+
+                    results = item.get("results", [])
+                    if not results:
+                        continue
+
+                    for result in results:
+                        if not isinstance(result, dict):
+                            continue
+
+                        # Extract user email
+                        actor = result.get("actor", {})
+                        email = actor.get("email_address")
+                        if not email:
+                            continue
+
+                        # Extract and sum costs from model breakdown
+                        model_breakdown = result.get("model_breakdown", [])
+                        for model_data in model_breakdown:
+                            if not isinstance(model_data, dict):
+                                continue
+
+                            cost = model_data.get("estimated_cost", 0)
+                            try:
+                                cost_float = float(cost)
+                            except (ValueError, TypeError):
+                                continue
+
+                            # Accumulate by user email
+                            if email not in user_costs:
+                                user_costs[email] = 0.0
+                            user_costs[email] += cost_float
+
+            # Move to next day
+            current_date += timedelta(days=1)
+
+        # Convert to list format
+        users_list = [
+            {"email": email, "cost_usd": cost} for email, cost in user_costs.items()
+        ]
+
+        return {"users": users_list}, None
+
+    def get_current_user_email(self):
+        """Get current user's email address from Admin API
+
+        Uses the /v1/organizations/users endpoint to identify the current user.
+        Result is cached after first successful call.
+
+        Returns:
+            tuple: (email_string, error_message) or (None, error_message) on failure
+        """
+        # Return cached value if available
+        if self._current_user_email_cache:
+            return self._current_user_email_cache, None
+
+        url = f"{self.base_url}/v1/organizations/users"
+        headers = self._get_headers()
+
+        users_data, error = self._handle_pagination(url, {}, headers)
+
+        if error:
+            return None, error
+
+        # Find current user
+        if users_data:
+            for user in users_data:
+                if not isinstance(user, dict):
+                    continue
+
+                # Check if this is the current user
+                if user.get("is_current_user"):
+                    email = user.get("email")
+                    if email:
+                        # Cache the result
+                        self._current_user_email_cache = email
+                        return email, None
+
+        return None, "Current user not found in organization users list"
 
 
 class ClaudeAPIClient:

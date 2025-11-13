@@ -166,12 +166,7 @@ class TestConsoleRendererMTDSection:
         # Should contain cost
         all_text = " ".join(str(r) for r in renderables)
         assert "123.45" in all_text
-        # Should have info message about organization-wide
-        assert (
-            "organization usage" in all_text.lower()
-            or "organization-wide" in all_text.lower()
-        )
-        # Should have a Progress bar (after header, cost, and info message)
+        # Should have a Progress bar
         from rich.progress import Progress
 
         progress_bars = [r for r in renderables if isinstance(r, Progress)]
@@ -192,8 +187,8 @@ class TestConsoleRendererMTDSection:
         # Should return a Group
         assert isinstance(result, Group)
         renderables = list(result.renderables)
-        # Should have header, cost, and info message, but no progress bar
-        assert len(renderables) == 3
+        # Should have header and cost, but no progress bar
+        assert len(renderables) == 2
         # Verify no Progress object
         from rich.progress import Progress
 

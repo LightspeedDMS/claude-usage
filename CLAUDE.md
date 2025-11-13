@@ -46,6 +46,10 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 - **Admin API Key**: Environment variable or credentials file
 - **Mode Detection**: Automatic based on Admin API key presence
 - **MTD Tracking**: Month-to-date cost reports
+- **Per-User Claude Code Usage**: Individual user tracking via `/v1/organizations/usage_report/claude_code` endpoint
+  - Day-by-day aggregation of costs by user email
+  - Current user identification via `/v1/organizations/users` endpoint
+  - Displays "Your Claude Code Usage: $X.XX" for authenticated user only
 - **Model Breakdown**: Per-model usage (Sonnet, Opus, Haiku) with token counts
 - **Workspace Limits**: Spending vs limits for each workspace
 - **Error Display**: Rate limits and API errors shown prominently
@@ -63,9 +67,11 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 ### Console Mode
 1. Admin API key → organization/workspaces/reports APIs
 2. MTD date ranges calculated automatically
-3. Console snapshots stored to database every 2 minutes
-4. Rate calculated for end-of-month projection
-5. Errors displayed with red border and warning messages
+3. Per-user Claude Code usage fetched via day-by-day iteration
+4. Current user email identified and matched against usage data
+5. Console snapshots stored to database every 2 minutes
+6. Rate calculated for end-of-month projection
+7. Errors displayed with red border and warning messages
 
 ## Technologies
 

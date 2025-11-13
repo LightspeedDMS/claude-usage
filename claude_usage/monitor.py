@@ -193,6 +193,30 @@ class ClaudeUsageMonitor:
         if error:
             self.error_message = error
 
+        # Fetch per-user Claude Code usage
+        claude_code_user_data, error = self.console_client.fetch_claude_code_user_usage(
+            mtd_start, mtd_end
+        )
+        if error:
+            self.error_message = error
+        else:
+            # Get current user email and find their cost
+            current_user_email, email_error = (
+                self.console_client.get_current_user_email()
+            )
+            if current_user_email and claude_code_user_data:
+                # Find current user's cost in the users list
+                current_user_cost = 0.0
+                for user in claude_code_user_data.get("users", []):
+                    if user.get("email") == current_user_email:
+                        current_user_cost = user.get("cost_usd", 0.0)
+                        break
+
+                # Add to mtd_cost dict
+                if self.mtd_cost:
+                    self.mtd_cost["claude_code_user_cost_usd"] = current_user_cost
+                    self.mtd_cost["current_user_email"] = current_user_email
+
         # Optional: Claude Code analytics (requires Firefox session key)
         session_key = None
         if hasattr(self, "firefox_manager"):

@@ -303,16 +303,13 @@ class ConsoleRenderer:
         period_label = mtd_data.get("period_label", "")
         content.append(Text(f"═══ Month-to-Date ({period_label}) ═══", style="bold"))
 
-        # Total cost line with organization label
+        # Total cost line
         total_cost = mtd_data.get("total_cost_usd", 0)
         content.append(
             Text(
-                f"Total Cost (Organization-Wide): {self._format_currency(total_cost)}",
+                f"Total Cost: {self._format_currency(total_cost)}",
                 style="yellow",
             )
-        )
-        content.append(
-            Text("  ⓘ Shows all organization usage, not individual user", style="dim")
         )
 
         # Progress bar if monthly_limit_usd exists
@@ -331,9 +328,20 @@ class ConsoleRenderer:
             _ = progress.add_task("budget", total=100, completed=utilization)
             content.append(progress)
 
-        # Claude Code data if exists
-        claude_code = mtd_data.get("claude_code")
-        if claude_code:
+        # Claude Code per-user cost if available
+        claude_code_user_cost = mtd_data.get("claude_code_user_cost_usd")
+        current_user_email = mtd_data.get("current_user_email")
+        if claude_code_user_cost is not None and current_user_email:
+            content.append(Text(""))  # spacing
+            content.append(
+                Text(
+                    f"Your Claude Code Usage: {self._format_currency(claude_code_user_cost)}",
+                    style="cyan",
+                )
+            )
+        # APPROVED FALLBACK: 2025-11-13 - Legacy Console analytics compatibility during transition
+        elif mtd_data.get("claude_code"):
+            claude_code = mtd_data.get("claude_code")
             sessions = claude_code.get("sessions", 0)
             cost = claude_code.get("cost_usd", 0)
             content.append(Text(""))  # spacing

@@ -47,7 +47,7 @@ class TestFetchConsoleData:
 
             # Mock date range calculations
             monitor.console_client._calculate_mtd_range = Mock(
-                return_value=(datetime(2025, 11, 1), datetime(2025, 11, 15))
+                return_value=("2025-11-01", "2025-11-15")
             )
 
             # Mock report fetches (only MTD now)
@@ -56,6 +56,14 @@ class TestFetchConsoleData:
             )
             monitor.console_client.fetch_cost_report = Mock(
                 return_value=({"total_cost_usd": 50.00}, None)  # MTD cost
+            )
+
+            # Mock per-user Claude Code usage
+            monitor.console_client.fetch_claude_code_user_usage = Mock(
+                return_value=({"users": []}, None)
+            )
+            monitor.console_client.get_current_user_email = Mock(
+                return_value=(None, "No users found")
             )
 
             # Mock optional analytics

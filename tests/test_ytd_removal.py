@@ -65,6 +65,8 @@ class TestYTDRemovalFromMonitor:
                 {"total_cost_usd": 100.0},
                 None,
             )
+            mock_client.fetch_claude_code_user_usage.return_value = ({"users": []}, None)
+            mock_client.get_current_user_email.return_value = (None, "No users")
             mock_client.fetch_claude_code_analytics.return_value = (None, None)
             monitor.console_client = mock_client
 
