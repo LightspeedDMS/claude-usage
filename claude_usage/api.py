@@ -496,11 +496,15 @@ class ConsoleAPIClient:
 
         return {"users": users_list}, None
 
-    def get_current_user_email(self):
-        """Get current user's email address from Admin API
+    def get_current_user_email(self, usage_users=None):
+        """Get current user's email address by matching system username
 
-        Uses the /v1/organizations/users endpoint to identify the current user.
+        Admin API doesn't provide is_current_user flag, so we use system username
+        to match against email addresses from Claude Code usage data.
         Result is cached after first successful call.
+
+        Args:
+            usage_users: List of user dicts from Claude Code usage (optional optimization)
 
         Returns:
             tuple: (email_string, error_message) or (None, error_message) on failure
@@ -509,6 +513,32 @@ class ConsoleAPIClient:
         if self._current_user_email_cache:
             return self._current_user_email_cache, None
 
+        import getpass
+
+        # Get system username
+        system_username = getpass.getuser().lower()
+
+        # Extract potential last name (e.g., jsbattig → battig)
+        # Common pattern: first initial + last name
+        search_terms = [system_username]
+        if len(system_username) > 4:
+            # Try last 4+ characters as potential last name
+            search_terms.append(system_username[2:])  # Skip first 2 chars
+
+        # If usage_users provided, search there first (faster)
+        if usage_users:
+            for user in usage_users:
+                if not isinstance(user, dict):
+                    continue
+                email = user.get("email", "").lower()
+                # Match if any search term is part of email
+                for term in search_terms:
+                    if term in email:
+                        # Cache the result
+                        self._current_user_email_cache = user.get("email")
+                        return user.get("email"), None
+
+        # Fallback: Try organization users API
         url = f"{self.base_url}/v1/organizations/users"
         headers = self._get_headers()
 
@@ -517,21 +547,24 @@ class ConsoleAPIClient:
         if error:
             return None, error
 
-        # Find current user
+        # Find user whose email matches system username
         if users_data:
             for user in users_data:
                 if not isinstance(user, dict):
                     continue
 
-                # Check if this is the current user
-                if user.get("is_current_user"):
-                    email = user.get("email")
-                    if email:
+                email = user.get("email", "").lower()
+                # Match if any search term is part of email
+                for term in search_terms:
+                    if term in email:
                         # Cache the result
-                        self._current_user_email_cache = email
-                        return email, None
+                        self._current_user_email_cache = user.get("email")
+                        return user.get("email"), None
 
-        return None, "Current user not found in organization users list"
+        return (
+            None,
+            f"No email found matching system user '{system_username}' (tried: {', '.join(search_terms)})",
+        )
 
 
 class ClaudeAPIClient:

@@ -221,17 +221,11 @@ class ConsoleRenderer:
             org_text = self._render_organization_info(org_data)
             content.append(org_text)
 
-        # MTD section
+        # MTD section - ONLY current user's Claude Code usage
         if mtd_data and not error:
             content.append(Text(""))
             mtd_content = self._render_mtd_section(mtd_data, projection)
             content.append(mtd_content)
-
-        # Workspaces section
-        if workspaces and not error:
-            content.append(Text(""))
-            workspaces_content = self._render_workspaces(workspaces)
-            content.extend(workspaces_content)
 
         # Show errors prominently
         if error:
@@ -296,83 +290,32 @@ class ConsoleRenderer:
         return result
 
     def _render_mtd_section(self, mtd_data, projection):
-        """Render month-to-date section with cost, progress bar, and projection"""
+        """Render month-to-date section showing ONLY current user's Claude Code usage"""
         content = []
 
         # Section header with period label
         period_label = mtd_data.get("period_label", "")
         content.append(Text(f"═══ Month-to-Date ({period_label}) ═══", style="bold"))
 
-        # Total cost line
-        total_cost = mtd_data.get("total_cost_usd", 0)
-        content.append(
-            Text(
-                f"Total Cost: {self._format_currency(total_cost)}",
-                style="yellow",
-            )
-        )
-
-        # Progress bar if monthly_limit_usd exists
-        monthly_limit = mtd_data.get("monthly_limit_usd")
-        if monthly_limit:
-            utilization = (total_cost / monthly_limit * 100) if monthly_limit > 0 else 0
-            color_style = self._get_color_style(utilization)
-
-            progress = Progress(
-                TextColumn("[bold]Budget:[/bold]"),
-                BarColumn(
-                    bar_width=20, complete_style=color_style, finished_style=color_style
-                ),
-                TextColumn("[bold]{task.percentage:>3.0f}%[/bold]"),
-            )
-            _ = progress.add_task("budget", total=100, completed=utilization)
-            content.append(progress)
-
-        # Claude Code per-user cost if available
+        # Show ONLY current user's Claude Code cost
         claude_code_user_cost = mtd_data.get("claude_code_user_cost_usd")
         current_user_email = mtd_data.get("current_user_email")
-        claude_code_users = mtd_data.get("claude_code_users", [])
 
         if claude_code_user_cost is not None and current_user_email:
-            # Show current user's cost
-            content.append(Text(""))  # spacing
+            # Show current user's cost prominently
             content.append(
                 Text(
                     f"Your Claude Code Usage: {self._format_currency(claude_code_user_cost)}",
-                    style="cyan",
+                    style="bold cyan",
                 )
             )
-        elif claude_code_users:
-            # Show top users when current user can't be identified
-            content.append(Text(""))  # spacing
-            content.append(Text("Claude Code Usage (Top Users):", style="bold"))
-            # Sort by cost and show top 5
-            sorted_users = sorted(
-                claude_code_users, key=lambda u: u.get("cost_usd", 0), reverse=True
-            )
-            for user in sorted_users[:5]:
-                email = user.get("email", "")
-                cost = user.get("cost_usd", 0)
-                content.append(Text(f"  {email}: {self._format_currency(cost)}"))
-        # APPROVED FALLBACK: 2025-11-13 - Legacy Console analytics compatibility during transition
-        elif mtd_data.get("claude_code"):
-            claude_code = mtd_data.get("claude_code")
-            sessions = claude_code.get("sessions", 0)
-            cost = claude_code.get("cost_usd", 0)
-            content.append(Text(""))  # spacing
-            content.append(
-                Text(f"Claude Code: {sessions} sessions, {self._format_currency(cost)}")
-            )
-
-        # Projection if provided and rate > 0
-        if projection and projection.get("rate_per_hour", 0) > 0:
-            projected_eom = projection.get("projected_eom_usd", 0)
-            rate = projection.get("rate_per_hour", 0)
-            content.append(Text(""))  # spacing
+            content.append(Text(f"({current_user_email})", style="dim"))
+        else:
+            # Error case - couldn't identify user
             content.append(
                 Text(
-                    f"Projected EOM: {self._format_currency(projected_eom)} at {self._format_currency(rate)}/hour",
-                    style="cyan",
+                    "Could not identify current user for usage tracking",
+                    style="yellow",
                 )
             )
 

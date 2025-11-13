@@ -200,24 +200,27 @@ class ClaudeUsageMonitor:
         if error:
             self.error_message = error
         elif claude_code_user_data and self.mtd_cost:
-            # Store all users data
-            self.mtd_cost["claude_code_users"] = claude_code_user_data.get("users", [])
+            users_list = claude_code_user_data.get("users", [])
 
-            # Try to identify current user (may not be possible with Admin API)
+            # Identify current user by matching system username against email addresses
             current_user_email, email_error = (
-                self.console_client.get_current_user_email()
+                self.console_client.get_current_user_email(usage_users=users_list)
             )
+
             if current_user_email:
                 # Find current user's cost in the users list
                 current_user_cost = 0.0
-                for user in claude_code_user_data.get("users", []):
+                for user in users_list:
                     if user.get("email") == current_user_email:
                         current_user_cost = user.get("cost_usd", 0.0)
                         break
 
-                # Add to mtd_cost dict
+                # Store ONLY current user's data
                 self.mtd_cost["claude_code_user_cost_usd"] = current_user_cost
                 self.mtd_cost["current_user_email"] = current_user_email
+            else:
+                # Store error if we couldn't identify user
+                self.error_message = email_error
 
         # Optional: Claude Code analytics (requires Firefox session key)
         session_key = None
@@ -239,46 +242,19 @@ class ClaudeUsageMonitor:
         return True
 
     def get_console_display(self):
-        """Generate console mode display"""
+        """Generate console mode display showing ONLY current user's Claude Code usage"""
         from rich.panel import Panel
-        from datetime import timedelta
 
         if not hasattr(self, "console_renderer"):
             return Panel("[red]Console mode not initialized[/red]")
 
-        # Calculate projection
-        projection = None
-        if self.mtd_cost:
-            rate = self.analytics.calculate_console_mtd_rate(
-                self.mtd_cost.get("total_cost_usd", 0)
-            )
-            if rate and rate > 0:
-                # Calculate hours until end of month
-                today = datetime.now()
-                # Calculate last day of current month
-                if today.month == 12:
-                    next_month = today.replace(year=today.year + 1, month=1, day=1)
-                else:
-                    next_month = today.replace(month=today.month + 1, day=1)
-                last_day_of_month = (next_month - timedelta(days=1)).day
-                hours_until_eom = (last_day_of_month - today.day) * 24 + (
-                    23 - today.hour
-                )
-                projected = self.analytics.project_console_eom_cost(
-                    self.mtd_cost.get("total_cost_usd", 0), rate, hours_until_eom
-                )
-                if projected:
-                    projection = {
-                        "projected_eom_cost": projected,
-                        "rate_per_hour": rate,
-                    }
-
+        # No projection calculation - we only show per-user cost, not organization-wide projections
         return self.console_renderer.render(
             self.console_org_data,
             self.mtd_cost,
             self.console_workspaces,
             self.last_update,
-            projection,
+            projection=None,
             error=self.error_message,
         )
 
