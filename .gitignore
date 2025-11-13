@@ -35,6 +35,3 @@ env/
 # OS
 .DS_Store
 Thumbs.db
-
-# Extraction directory (empty)
-claude-code-extracted/
