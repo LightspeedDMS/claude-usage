@@ -4,7 +4,7 @@ A live-updating terminal dashboard for monitoring Claude Code account usage and 
 
 ## Overview
 
-This tool continuously monitors your Claude Code account usage through the officially discovered API endpoint, displaying real-time usage statistics and reset timers directly in your terminal.
+This tool continuously monitors your Claude Code account usage through the Claude Code API, displaying real-time usage statistics and reset timers directly in your terminal.
 
 ## Features
 
@@ -88,9 +88,9 @@ Press Ctrl+C to stop
 
 ## How It Works
 
-### API Discovery
+### API Endpoint
 
-This tool uses the Claude Code usage API endpoint discovered through reverse engineering and SSL traffic interception:
+This tool uses the Claude Code usage API endpoint:
 
 ```
 GET https://api.anthropic.com/api/oauth/usage
@@ -124,15 +124,6 @@ User-Agent: claude-code/2.0.37
 }
 ```
 
-## Discovery Process
-
-The API endpoint was discovered through:
-1. Binary reverse engineering (strings extraction from Claude Code executable)
-2. SSL interception using mitmproxy
-3. Traffic analysis to identify the usage endpoint
-
-Full discovery documentation available in `FINAL_FINDINGS.md`.
-
 ## Technical Details
 
 ### Rate Limits
@@ -148,12 +139,6 @@ OAuth tokens have an expiration time tracked in the credentials file:
 - Tokens are checked for expiry before each API call
 - 5-minute buffer applied to prevent edge cases
 - User prompted to refresh via `claude` command when expired
-
-## Files
-
-- `monitor-usage.py` - Main monitoring script
-- `FINAL_FINDINGS.md` - Complete API discovery documentation
-- `CLAUDE_USAGE_MONITORING_INVESTIGATION.md` - Investigation notes
 
 ## Troubleshooting
 
@@ -198,5 +183,4 @@ MIT License - See LICENSE file for details.
 
 ## Acknowledgments
 
-- API endpoint discovered through reverse engineering the Claude Code CLI
-- Built with the excellent [Rich](https://github.com/Textualize/rich) library for terminal UI
+Built with the excellent [Rich](https://github.com/Textualize/rich) library for terminal UI.
