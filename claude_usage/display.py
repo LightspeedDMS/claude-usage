@@ -44,7 +44,12 @@ class UsageRenderer:
 
         # Overage credits
         if last_overage:
-            self._render_overage(content, last_overage, projection)
+            # Get current utilization to check if in overage
+            utilization = 0
+            if last_usage and last_usage.get("five_hour"):
+                utilization = last_usage["five_hour"].get("utilization", 0)
+
+            self._render_overage(content, last_overage, projection, utilization)
 
         # Last update time
         if last_update:
@@ -143,7 +148,7 @@ class UsageRenderer:
         content.append(Text(""))  # spacing
         content.append(progress)
 
-    def _render_overage(self, content, overage, projection):
+    def _render_overage(self, content, overage, projection, utilization):
         """Render overage and projection display"""
         used_credits = overage.get("used_credits", 0)
         monthly_limit = overage.get("monthly_credit_limit")
@@ -168,8 +173,8 @@ class UsageRenderer:
                 # No limit, just show used dollars
                 content.append(Text(f"💳 Overage: ${used_dollars:.2f}", style="bold yellow"))
 
-            # Projection display
-            if projection:
+            # Projection display - only show when currently in overage (utilization >= 100)
+            if projection and utilization >= 100:
                 current_dollars = projection['current_credits'] / 100
                 projected_dollars = projection['projected_credits'] / 100
                 rate_dollars = projection['rate_per_hour'] / 100
