@@ -1,6 +1,127 @@
 """API client for Claude Code usage monitoring"""
 
 import requests
+from datetime import date
+
+
+class ConsoleAPIClient:
+    """Client for Anthropic Console API endpoints"""
+
+    def __init__(self, admin_key):
+        self.admin_key = admin_key
+        self.base_url = "https://api.anthropic.com"
+
+    def _get_headers(self):
+        """Return required headers for Console API requests"""
+        return {
+            "x-api-key": self.admin_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+
+    def _calculate_mtd_range(self):
+        """Calculate Month-to-Date date range
+
+        Returns:
+            tuple: (starting_at, ending_at) in YYYY-MM-DD format
+        """
+        today = date.today()
+        starting_at = date(today.year, today.month, 1)
+        return starting_at.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
+
+    def _calculate_ytd_range(self):
+        """Calculate Year-to-Date date range"""
+        today = date.today()
+        starting_at = date(today.year, 1, 1)
+        return starting_at.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
+
+    def fetch_organization(self):
+        """Fetch organization data from Console API
+
+        Returns:
+            tuple: (data_dict, error_message) or (None, error_message) on failure
+        """
+        url = f"{self.base_url}/v1/organizations/me"
+        headers = self._get_headers()
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+
+            if response.status_code == 200:
+                return response.json(), None
+            elif response.status_code in (401, 403):
+                return None, "Authentication failed - check Admin API key"
+            else:
+                return None, f"API error: {response.status_code}"
+
+        except requests.exceptions.RequestException:
+            return None, "Network error - retrying"
+
+    def _handle_pagination(self, url, params, headers):
+        """Handle paginated API responses"""
+        all_data = []
+        has_more = True
+        next_page_token = None
+
+        while has_more:
+            current_params = params.copy()
+            if next_page_token:
+                current_params["page_token"] = next_page_token
+
+            response = requests.get(
+                url, params=current_params, headers=headers, timeout=10
+            )
+
+            # Check for errors
+            if response.status_code == 429:
+                return (
+                    None,
+                    "Rate limit exceeded - please wait a few minutes and try again",
+                )
+            elif response.status_code in (401, 403):
+                return None, "Authentication failed - check Admin API key"
+            elif response.status_code != 200:
+                return (
+                    None,
+                    f"API error: {response.status_code} - {response.text[:100]}",
+                )
+
+            data = response.json()
+
+            if "data" in data:
+                all_data.extend(data["data"])
+
+            has_more = data.get("has_more", False)
+            next_page_token = data.get("next_page_token")
+
+        return all_data, None
+
+    def fetch_workspaces(self):
+        """Fetch workspaces list"""
+        url = f"{self.base_url}/v1/organizations/workspaces"
+        headers = self._get_headers()
+        workspaces, error = self._handle_pagination(url, {}, headers)
+        return workspaces, error
+
+    def fetch_usage_report(self, starting_at, ending_at):
+        """Fetch usage report"""
+        url = f"{self.base_url}/v1/organizations/usage_report/messages"
+        headers = self._get_headers()
+        params = {"starting_at": starting_at, "ending_at": ending_at}
+        usage_data, error = self._handle_pagination(url, params, headers)
+        return usage_data, error
+
+    def fetch_cost_report(self, starting_at, ending_at):
+        """Fetch cost report"""
+        url = f"{self.base_url}/v1/organizations/cost_report"
+        headers = self._get_headers()
+        params = {"starting_at": starting_at, "ending_at": ending_at}
+        cost_data, error = self._handle_pagination(url, params, headers)
+        return cost_data, error
+
+    def fetch_claude_code_analytics(self, starting_at, ending_at):
+        """Fetch Claude Code analytics"""
+        return None, None
 
 
 class ClaudeAPIClient:

@@ -49,3 +49,6 @@ claude-usage = "claude_usage.monitor:main"
 where = ["."]
 include = ["claude_usage*"]
 exclude = ["tests*", "docs*"]
+
+[tool.pytest.ini_options]
+tdd_guard_project_root = "."

@@ -124,7 +124,6 @@ class UsageRenderer:
             TextColumn("[bold]5-Hour Limit:[/bold]"),
             BarColumn(
                 bar_width=20,
-                style=bar_style,
                 complete_style=bar_style,
                 finished_style=bar_style,
             ),
@@ -200,3 +199,203 @@ class UsageRenderer:
                     )
                 )
                 content.append(Text(f"📈 Rate: ${rate_dollars:.2f}/hour", style="dim"))
+
+
+class ConsoleRenderer:
+    """Renders Console API usage data with MTD/YTD display"""
+
+    def render(
+        self,
+        org_data,
+        mtd_data,
+        ytd_data,
+        workspaces,
+        last_update,
+        projection,
+        error=None,
+    ):
+        """Generate rich display for Console API usage"""
+        content = []
+
+        # Organization info
+        if org_data:
+            org_text = self._render_organization_info(org_data)
+            content.append(org_text)
+
+        # MTD section
+        if mtd_data and not error:
+            content.append(Text(""))
+            mtd_content = self._render_mtd_section(mtd_data, projection)
+            content.append(mtd_content)
+
+        # YTD section
+        if ytd_data and not error:
+            content.append(Text(""))
+            ytd_content = self._render_ytd_section(ytd_data)
+            content.append(ytd_content)
+
+        # Workspaces section
+        if workspaces and not error:
+            content.append(Text(""))
+            workspaces_content = self._render_workspaces(workspaces)
+            content.extend(workspaces_content)
+
+        # Show errors prominently
+        if error:
+            content.append(Text(""))
+            content.append(Text(f"⚠️  {error}", style="bold red"))
+            content.append(Text(""))
+
+        # Combine content
+        display = Group(*content)
+        border_color = "red" if error else "green"
+        return Panel(display, title="Console Usage", border_style=border_color)
+
+    def _format_tokens(self, count):
+        """Format token count with K/M suffix"""
+        if count >= 1_000_000:
+            return f"{count / 1_000_000:.1f}M"
+        elif count >= 1_000:
+            return f"{int(count / 1_000)}K"
+        return str(count)
+
+    def _format_currency(self, amount):
+        """Format currency with dollar sign and two decimals"""
+        return f"${amount:,.2f}"
+
+    def _get_color_style(self, utilization):
+        """Get color style based on utilization percentage"""
+        if utilization < 50:
+            return "green"
+        elif utilization < 80:
+            return "yellow"
+        elif utilization < 100:
+            return "bright_yellow"
+        return "red"
+
+    def _render_organization_info(self, org_data):
+        """Render organization information"""
+        org_name = org_data.get("name", "")
+        return Text(f"🏢 {org_name}")
+
+    def _render_model_breakdown(self, models, period):
+        """Render per-model cost and token breakdown"""
+        result = []
+        for model_name, data in models.items():
+            cost = data.get("cost_usd", 0)
+            input_tokens = data.get("input_tokens", 0)
+            output_tokens = data.get("output_tokens", 0)
+
+            # Format: "• model-name    $X.XX  (Xin / Xout)"
+            cost_str = self._format_currency(cost)
+            input_str = self._format_tokens(input_tokens)
+            output_str = self._format_tokens(output_tokens)
+
+            line = Text(
+                f"• {model_name}    {cost_str}  ({input_str} in / {output_str} out)"
+            )
+            result.append(line)
+
+        return result
+
+    def _render_mtd_section(self, mtd_data, projection):
+        """Render month-to-date section with cost, progress bar, and projection"""
+        content = []
+
+        # Section header with period label
+        period_label = mtd_data.get("period_label", "")
+        content.append(Text(f"═══ Month-to-Date ({period_label}) ═══", style="bold"))
+
+        # Total cost line
+        total_cost = mtd_data.get("total_cost_usd", 0)
+        content.append(Text(f"Total Cost: {self._format_currency(total_cost)}"))
+
+        # Progress bar if monthly_limit_usd exists
+        monthly_limit = mtd_data.get("monthly_limit_usd")
+        if monthly_limit:
+            utilization = (total_cost / monthly_limit * 100) if monthly_limit > 0 else 0
+            color_style = self._get_color_style(utilization)
+
+            progress = Progress(
+                TextColumn("[bold]Budget:[/bold]"),
+                BarColumn(
+                    bar_width=20, complete_style=color_style, finished_style=color_style
+                ),
+                TextColumn("[bold]{task.percentage:>3.0f}%[/bold]"),
+            )
+            _ = progress.add_task("budget", total=100, completed=utilization)
+            content.append(progress)
+
+        # Claude Code data if exists
+        claude_code = mtd_data.get("claude_code")
+        if claude_code:
+            sessions = claude_code.get("sessions", 0)
+            cost = claude_code.get("cost_usd", 0)
+            content.append(Text(""))  # spacing
+            content.append(
+                Text(f"Claude Code: {sessions} sessions, {self._format_currency(cost)}")
+            )
+
+        # Projection if provided and rate > 0
+        if projection and projection.get("rate_per_hour", 0) > 0:
+            projected_eom = projection.get("projected_eom_usd", 0)
+            rate = projection.get("rate_per_hour", 0)
+            content.append(Text(""))  # spacing
+            content.append(
+                Text(
+                    f"Projected EOM: {self._format_currency(projected_eom)} at {self._format_currency(rate)}/hour",
+                    style="cyan",
+                )
+            )
+
+        return Group(*content)
+
+    def _render_ytd_section(self, ytd_data):
+        """Render year-to-date section with cost and model breakdown"""
+        content = []
+
+        # Section header with year
+        period_label = ytd_data.get("period_label", "")
+        content.append(Text(f"═══ Year-to-Date ({period_label}) ═══", style="bold"))
+
+        # Total cost line
+        total_cost = ytd_data.get("total_cost_usd", 0)
+        content.append(Text(f"Total Cost: {self._format_currency(total_cost)}"))
+
+        # Model breakdown (NO progress bar for YTD)
+        models = ytd_data.get("by_model", {})
+        if models:
+            content.append(Text(""))  # spacing
+            model_lines = self._render_model_breakdown(models, "YTD")
+            content.extend(model_lines)
+
+        # Claude Code if exists
+        claude_code = ytd_data.get("claude_code")
+        if claude_code:
+            sessions = claude_code.get("sessions", 0)
+            cost = claude_code.get("cost_usd", 0)
+            content.append(Text(""))  # spacing
+            content.append(
+                Text(f"Claude Code: {sessions} sessions, {self._format_currency(cost)}")
+            )
+
+        return Group(*content)
+
+    def _render_workspaces(self, workspaces):
+        """Render workspace spend and limits with progress bars"""
+        result = []
+        result.append(Text("Workspaces:", style="bold"))
+
+        for workspace in workspaces:
+            name = workspace.get("name", "")
+            spend = workspace.get("spend_usd", 0)
+            limit = workspace.get("limit_usd")
+
+            spend_str = self._format_currency(spend)
+            if limit:
+                limit_str = self._format_currency(limit)
+                result.append(Text(f"• {name}    {spend_str} / {limit_str}"))
+            else:
+                result.append(Text(f"• {name}    {spend_str}"))
+
+        return result

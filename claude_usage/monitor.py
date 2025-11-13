@@ -22,7 +22,8 @@ console = Console()
 class ClaudeUsageMonitor:
     """Monitor Claude Code account usage via the discovered API"""
 
-    POLL_INTERVAL = 30  # seconds
+    POLL_INTERVAL_CODE = 30  # seconds - for Code mode
+    POLL_INTERVAL_CONSOLE = 120  # seconds - for Console mode (2 minutes)
 
     def __init__(self, credentials_path=None):
         if credentials_path is None:
@@ -32,13 +33,29 @@ class ClaudeUsageMonitor:
         storage_dir = Path.home() / ".claude-usage"
         db_path = storage_dir / "usage_history.db"
 
-        # Initialize components
-        self.oauth_manager = OAuthManager(self.credentials_path)
-        self.firefox_manager = FirefoxSessionManager()
-        self.api_client = ClaudeAPIClient()
+        # Detect mode early
+        self.mode = self.detect_mode()
+
+        # Initialize mode-specific components
+        if self.mode == "console":
+            from .auth import AdminAuthManager
+            from .api import ConsoleAPIClient
+            from .display import ConsoleRenderer
+
+            self.admin_auth_manager = AdminAuthManager(self.credentials_path)
+            admin_key, _, _ = self.admin_auth_manager.load_admin_credentials()
+            self.console_client = ConsoleAPIClient(admin_key) if admin_key else None
+            self.console_renderer = ConsoleRenderer()
+        else:
+            # Code mode
+            self.oauth_manager = OAuthManager(self.credentials_path)
+            self.firefox_manager = FirefoxSessionManager()
+            self.api_client = ClaudeAPIClient()
+            self.renderer = UsageRenderer()
+
+        # Common components
         self.storage = UsageStorage(db_path)
         self.analytics = UsageAnalytics(self.storage)
-        self.renderer = UsageRenderer()
 
         # State
         self.credentials = None
@@ -51,16 +68,165 @@ class ClaudeUsageMonitor:
         self.last_overage = None
         self.last_update = None
 
+        # Console mode state
+        self.console_org = None
+        self.console_org_data = None
+        self.console_workspaces = None
+        self.mtd_usage = None
+        self.mtd_cost = None
+        self.ytd_usage = None
+        self.ytd_cost = None
+        self.console_code_analytics = None
+
         self.error_message = None
 
-        # Load initial credentials
-        self._load_credentials()
+        # Load initial credentials (Code mode only)
+        if self.mode == "code":
+            self._load_credentials()
 
     def _load_credentials(self):
         """Load OAuth credentials from Claude Code config"""
         self.credentials, error = self.oauth_manager.load_credentials()
         if error:
             self.error_message = error
+
+    def detect_mode(self):
+        """Detect which mode to run in: 'console' or 'code'"""
+        import os
+        import json
+
+        # Check environment variable first
+        if os.environ.get("ANTHROPIC_ADMIN_API_KEY"):
+            return "console"
+
+        # Check credentials file
+        try:
+            with open(self.credentials_path) as f:
+                data = json.load(f)
+
+            # Check for explicit mode field override
+            if "mode" in data and data["mode"] in ["console", "code"]:
+                return data["mode"]
+
+            if "anthropicConsole" in data and "adminApiKey" in data["anthropicConsole"]:
+                return "console"
+
+            # Check for OAuth credentials
+            if "claudeCode" in data or "claudeAiOauth" in data:
+                return "code"
+        except Exception:
+            pass
+
+        # No credentials found
+        self.error_message = "No credentials found"
+        return None
+
+    def resolve_mode(self, cli_mode=None):
+        """Resolve final mode: CLI override or auto-detect"""
+        if cli_mode:
+            return cli_mode
+        return self.detect_mode()
+
+    def fetch_console_data(self):
+        """Fetch all console data for MTD and YTD"""
+        if not hasattr(self, "console_client"):
+            return False
+
+        # Fetch organization
+        self.console_org_data, error = self.console_client.fetch_organization()
+        if error:
+            self.error_message = error
+            return False
+
+        # Fetch workspaces
+        self.console_workspaces, error = self.console_client.fetch_workspaces()
+        if error:
+            self.error_message = error
+
+        # Calculate date ranges
+        mtd_start, mtd_end = self.console_client._calculate_mtd_range()
+        ytd_start, ytd_end = self.console_client._calculate_ytd_range()
+
+        # Fetch MTD data
+        self.mtd_usage, error = self.console_client.fetch_usage_report(
+            mtd_start, mtd_end
+        )
+        if error:
+            self.error_message = error
+
+        self.mtd_cost, error = self.console_client.fetch_cost_report(mtd_start, mtd_end)
+        if error:
+            self.error_message = error
+
+        # Fetch YTD data
+        self.ytd_usage, error = self.console_client.fetch_usage_report(
+            ytd_start, ytd_end
+        )
+        if error:
+            self.error_message = error
+
+        self.ytd_cost, error = self.console_client.fetch_cost_report(ytd_start, ytd_end)
+        if error:
+            self.error_message = error
+
+        # Optional: Claude Code analytics
+        self.console_code_analytics, _ = (
+            self.console_client.fetch_claude_code_analytics(mtd_start, mtd_end)
+        )
+
+        # Store snapshot
+        if self.mtd_cost and self.ytd_cost:
+            self.storage.store_console_snapshot(
+                self.mtd_cost, self.ytd_cost, self.console_workspaces
+            )
+
+        self.last_update = datetime.now()
+        return True
+
+    def get_console_display(self):
+        """Generate console mode display"""
+        from rich.panel import Panel
+        from datetime import timedelta
+
+        if not hasattr(self, "console_renderer"):
+            return Panel("[red]Console mode not initialized[/red]")
+
+        # Calculate projection
+        projection = None
+        if self.mtd_cost:
+            rate = self.analytics.calculate_console_mtd_rate(
+                self.mtd_cost.get("total_cost_usd", 0)
+            )
+            if rate and rate > 0:
+                # Calculate hours until end of month
+                today = datetime.now()
+                # Calculate last day of current month
+                if today.month == 12:
+                    next_month = today.replace(year=today.year + 1, month=1, day=1)
+                else:
+                    next_month = today.replace(month=today.month + 1, day=1)
+                last_day_of_month = (next_month - timedelta(days=1)).day
+                hours_until_eom = (last_day_of_month - today.day) * 24 + (
+                    23 - today.hour
+                )
+                projected = self.analytics.project_console_eom_cost(
+                    self.mtd_cost.get("total_cost_usd", 0), rate, hours_until_eom
+                )
+                if projected:
+                    projection = {
+                        "projected_eom_cost": projected,
+                        "rate_per_hour": rate,
+                    }
+
+        return self.console_renderer.render(
+            self.console_org_data,
+            self.mtd_cost,
+            self.ytd_cost,
+            self.console_workspaces,
+            self.last_update,
+            projection,
+            error=self.error_message,
+        )
 
     def fetch_usage(self):
         """Fetch current usage data from Claude Code API"""
@@ -127,10 +293,11 @@ class ClaudeUsageMonitor:
             return False
 
     def refresh_session_key(self):
-        """Refresh session key from Firefox if needed"""
-        session_key = self.firefox_manager.refresh_session_key()
-        if session_key:
-            self.session_key = session_key
+        """Refresh session key from Firefox if needed (Code mode only)"""
+        if hasattr(self, "firefox_manager"):
+            session_key = self.firefox_manager.refresh_session_key()
+            if session_key:
+                self.session_key = session_key
 
     def store_snapshot(self):
         """Store current usage snapshot to database"""
@@ -139,6 +306,11 @@ class ClaudeUsageMonitor:
 
     def get_display(self):
         """Generate rich display for current usage"""
+        # Route to appropriate renderer based on mode
+        if self.mode == "console":
+            return self.get_console_display()
+
+        # Code mode (existing behavior)
         projection = None
         if self.last_overage and self.last_usage:
             projection = self.analytics.project_usage(
@@ -155,53 +327,77 @@ class ClaudeUsageMonitor:
         )
 
 
+def parse_args():
+    """Parse command line arguments"""
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", default=None)
+    return parser.parse_args()
+
+
 def main():
     """Main entry point"""
+    args = parse_args()
     monitor = ClaudeUsageMonitor()
 
-    console.print("[cyan]Claude Code Usage Monitor[/cyan]")
-    console.print("[dim]Press Ctrl+C to stop[/dim]\n")
+    # Resolve mode (CLI override or auto-detect)
+    mode = monitor.resolve_mode(cli_mode=args.mode)
 
-    # Fetch profile once at startup
-    monitor.fetch_profile()
+    if not mode and monitor.error_message:
+        console.print(f"[red]Error: {monitor.error_message}[/red]\n")
+        return 1
 
-    # Try to extract Firefox session key for overage data
-    session_key = monitor.firefox_manager.extract_session_key()
-    if session_key:
-        monitor.session_key = session_key
-        monitor.firefox_manager.last_refresh = datetime.now()
-        console.print(
-            "[dim]✓ Firefox session key detected - overage data enabled[/dim]\n"
-        )
-    else:
-        console.print(
-            "[dim]ℹ Firefox session not found - overage data unavailable[/dim]\n"
-        )
+    # Fetch profile once at startup (Code mode only)
+    if mode == "code":
+        monitor.fetch_profile()
+
+    # Try to extract Firefox session key for overage data (Code mode only)
+    if mode == "code" and hasattr(monitor, "firefox_manager"):
+        session_key = monitor.firefox_manager.extract_session_key()
+        if session_key:
+            monitor.session_key = session_key
+            monitor.firefox_manager.last_refresh = datetime.now()
+            console.print("[dim]Overage report using Firefox session[/dim]\n")
 
     try:
-        with Live(monitor.get_display(), refresh_per_second=1, console=console) as live:
+        # Show instruction below the display
+        from rich.console import Group
+        from rich.text import Text
+
+        with Live(refresh_per_second=1, console=console) as live:
             while True:
-                # Refresh session key periodically
-                monitor.refresh_session_key()
+                # Route to appropriate fetch method based on mode
+                if mode == "console":
+                    monitor.fetch_console_data()
+                else:
+                    # Code mode - refresh session key periodically
+                    monitor.refresh_session_key()
 
-                # Fetch usage
-                monitor.fetch_usage()
+                    # Fetch usage
+                    monitor.fetch_usage()
 
-                # Fetch overage data if session key available
-                if monitor.session_key and monitor.org_uuid:
-                    monitor.fetch_overage()
-                    # Store snapshot for projection calculation
-                    if monitor.last_overage:
-                        monitor.store_snapshot()
+                    # Fetch overage data if session key available
+                    if monitor.session_key and monitor.org_uuid:
+                        monitor.fetch_overage()
+                        # Store snapshot for projection calculation
+                        if monitor.last_overage:
+                            monitor.store_snapshot()
 
-                # Update display
-                live.update(monitor.get_display())
+                # Update display with instruction below
+                display = monitor.get_display()
+                instruction = Text("Press Ctrl+C to stop", style="dim")
+                live.update(Group(display, Text(""), instruction))
 
-                # Wait before next poll
-                time.sleep(monitor.POLL_INTERVAL)
+                # Wait before next poll (mode-specific interval)
+                poll_interval = (
+                    monitor.POLL_INTERVAL_CONSOLE
+                    if mode == "console"
+                    else monitor.POLL_INTERVAL_CODE
+                )
+                time.sleep(poll_interval)
 
     except KeyboardInterrupt:
-        console.print("\n[yellow]Stopped by user[/yellow]")
         return 0
 
 

@@ -1,5 +1,6 @@
 """Storage and analytics for Claude Code usage tracking"""
 
+import logging
 import sqlite3
 from pathlib import Path
 from datetime import datetime
@@ -45,6 +46,18 @@ class UsageStorage:
             """
             )
 
+            # Create console usage snapshots table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS console_usage_snapshots (
+                    timestamp INTEGER PRIMARY KEY,
+                    mtd_cost REAL,
+                    ytd_cost REAL,
+                    workspace_costs_json TEXT
+                )
+            """
+            )
+
             conn.commit()
             conn.close()
 
@@ -64,29 +77,73 @@ class UsageStorage:
             resets_at = usage_data.get("five_hour", {}).get("resets_at", "")
 
             conn = sqlite3.connect(self.db_path)
+            try:
+                cursor = conn.cursor()
+
+                # Insert snapshot
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO usage_snapshots
+                    (timestamp, credits_used, utilization_percent, resets_at)
+                    VALUES (?, ?, ?, ?)
+                """,
+                    (timestamp, credits_used, utilization, resets_at),
+                )
+
+                # Clean old data (keep only last 24 hours)
+                cutoff = timestamp - self.HISTORY_RETENTION
+                cursor.execute(
+                    "DELETE FROM usage_snapshots WHERE timestamp < ?", (cutoff,)
+                )
+
+                conn.commit()
+            finally:
+                conn.close()
+
+            return True
+
+        except Exception as e:
+            logging.getLogger(__name__).error(
+                f"Failed to store snapshot: {e}", exc_info=True
+            )
+            return False  # Non-fatal
+
+    def store_console_snapshot(self, mtd_data, ytd_data, workspaces):
+        """Store console usage snapshot to database"""
+        if not mtd_data or not ytd_data:
+            return False
+
+        import json
+
+        timestamp = int(datetime.now().timestamp())
+        mtd_cost = mtd_data.get("total_cost_usd", 0)
+        ytd_cost = ytd_data.get("total_cost_usd", 0)
+        workspace_json = json.dumps(workspaces)
+
+        conn = sqlite3.connect(self.db_path)
+        try:
             cursor = conn.cursor()
 
-            # Insert snapshot
             cursor.execute(
                 """
-                INSERT OR REPLACE INTO usage_snapshots
-                (timestamp, credits_used, utilization_percent, resets_at)
+                INSERT OR REPLACE INTO console_usage_snapshots
+                (timestamp, mtd_cost, ytd_cost, workspace_costs_json)
                 VALUES (?, ?, ?, ?)
             """,
-                (timestamp, credits_used, utilization, resets_at),
+                (timestamp, mtd_cost, ytd_cost, workspace_json),
             )
 
             # Clean old data (keep only last 24 hours)
             cutoff = timestamp - self.HISTORY_RETENTION
-            cursor.execute("DELETE FROM usage_snapshots WHERE timestamp < ?", (cutoff,))
+            cursor.execute(
+                "DELETE FROM console_usage_snapshots WHERE timestamp < ?", (cutoff,)
+            )
 
             conn.commit()
+        finally:
             conn.close()
 
-            return True
-
-        except Exception:
-            return False  # Non-fatal
+        return True
 
     def calculate_usage_rate(self, current_credits):
         """Calculate usage rate in credits per hour"""
@@ -100,21 +157,23 @@ class UsageStorage:
             cutoff = current_timestamp - self.RATE_CALC_WINDOW
 
             conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            try:
+                cursor = conn.cursor()
 
-            cursor.execute(
-                """
-                SELECT timestamp, credits_used
-                FROM usage_snapshots
-                WHERE timestamp >= ?
-                ORDER BY timestamp ASC
-                LIMIT 1
-            """,
-                (cutoff,),
-            )
+                cursor.execute(
+                    """
+                    SELECT timestamp, credits_used
+                    FROM usage_snapshots
+                    WHERE timestamp >= ?
+                    ORDER BY timestamp ASC
+                    LIMIT 1
+                """,
+                    (cutoff,),
+                )
 
-            result = cursor.fetchone()
-            conn.close()
+                result = cursor.fetchone()
+            finally:
+                conn.close()
 
             if not result:
                 return None
@@ -135,7 +194,10 @@ class UsageStorage:
 
             return rate
 
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(
+                f"Failed to calculate usage rate: {e}", exc_info=True
+            )
             return None
 
 
@@ -144,6 +206,71 @@ class UsageAnalytics:
 
     def __init__(self, storage):
         self.storage = storage
+
+    def calculate_console_mtd_rate(self, current_mtd_cost):
+        """Calculate console MTD spending rate in dollars per hour"""
+        if current_mtd_cost is None:
+            return None
+
+        try:
+            current_timestamp = int(datetime.now().timestamp())
+            cutoff = current_timestamp - self.storage.RATE_CALC_WINDOW
+
+            conn = sqlite3.connect(self.storage.db_path)
+            try:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT timestamp, mtd_cost
+                    FROM console_usage_snapshots
+                    WHERE timestamp >= ?
+                    ORDER BY timestamp ASC
+                    LIMIT 1
+                """,
+                    (cutoff,),
+                )
+
+                result = cursor.fetchone()
+            finally:
+                conn.close()
+
+            if not result:
+                return None
+
+            old_timestamp, old_cost = result
+
+            time_diff = current_timestamp - old_timestamp
+            if time_diff == 0:
+                return None
+
+            cost_diff = current_mtd_cost - old_cost
+            if cost_diff <= 0:
+                return 0
+
+            # Dollars per hour
+            rate = (cost_diff / time_diff) * 3600
+            return rate
+
+        except Exception as e:
+            logging.getLogger(__name__).error(
+                f"Failed to calculate console MTD rate: {e}", exc_info=True
+            )
+            return None
+
+    def project_console_eom_cost(
+        self, current_mtd_cost, rate_per_hour, hours_until_eom
+    ):
+        """Project console spending to end of month"""
+        if current_mtd_cost is None or rate_per_hour is None or hours_until_eom is None:
+            return None
+
+        # Don't project into the past
+        if hours_until_eom < 0:
+            return current_mtd_cost
+
+        projected_cost = current_mtd_cost + (rate_per_hour * hours_until_eom)
+        return projected_cost
 
     def project_usage(self, overage_data, usage_data):
         """Project usage by reset time"""

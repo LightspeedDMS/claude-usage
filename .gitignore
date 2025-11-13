@@ -35,3 +35,10 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+/.tmp
+/reports
+.coverage
+.claude/tdd-guard/data/instructions.md
+.claude/tdd-guard/data/modifications.json
+.claude/tdd-guard/data/test.json
+coverage.json
