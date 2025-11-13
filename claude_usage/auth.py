@@ -25,10 +25,16 @@ class OAuthManager:
         """
         try:
             result = subprocess.run(
-                ["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
+                [
+                    "security",
+                    "find-generic-password",
+                    "-s",
+                    "Claude Code-credentials",
+                    "-w",
+                ],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
 
             credentials_json = result.stdout.strip()
@@ -96,7 +102,10 @@ class OAuthManager:
 
                 return data["claudeAiOauth"], None
             else:
-                return None, "Credentials file not found. Please run 'claude' to authenticate."
+                return (
+                    None,
+                    "Credentials file not found. Please run 'claude' to authenticate.",
+                )
 
         except Exception as e:
             return None, f"Failed to load credentials: {e}"

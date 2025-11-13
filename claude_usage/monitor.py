@@ -37,21 +37,7 @@ class ClaudeUsageMonitor:
         self.mode = self.detect_mode()
 
         # Initialize mode-specific components
-        if self.mode == "console":
-            from .auth import AdminAuthManager
-            from .api import ConsoleAPIClient
-            from .display import ConsoleRenderer
-
-            self.admin_auth_manager = AdminAuthManager(self.credentials_path)
-            admin_key, _, _ = self.admin_auth_manager.load_admin_credentials()
-            self.console_client = ConsoleAPIClient(admin_key) if admin_key else None
-            self.console_renderer = ConsoleRenderer()
-        else:
-            # Code mode
-            self.oauth_manager = OAuthManager(self.credentials_path)
-            self.firefox_manager = FirefoxSessionManager()
-            self.api_client = ClaudeAPIClient()
-            self.renderer = UsageRenderer()
+        self._initialize_mode_components()
 
         # Common components
         self.storage = UsageStorage(db_path)
@@ -122,6 +108,7 @@ class ClaudeUsageMonitor:
             if platform.system() == "Darwin":
                 # Try to detect credentials in Keychain
                 from .auth import OAuthManager
+
                 temp_oauth = OAuthManager(self.credentials_path)
                 data, error = temp_oauth.extract_from_macos_keychain()
                 if data and not error:
@@ -138,10 +125,34 @@ class ClaudeUsageMonitor:
         return None
 
     def resolve_mode(self, cli_mode=None):
-        """Resolve final mode: CLI override or auto-detect"""
-        if cli_mode:
+        """Resolve final mode: CLI override or auto-detect
+
+        If CLI mode differs from detected mode, reinitialize components
+        """
+        if cli_mode and cli_mode != self.mode:
+            # CLI override requires reinitialization
+            self.mode = cli_mode
+            self._initialize_mode_components()
             return cli_mode
-        return self.detect_mode()
+        return self.mode
+
+    def _initialize_mode_components(self):
+        """Initialize mode-specific components based on current mode"""
+        if self.mode == "console":
+            from .auth import AdminAuthManager
+            from .api import ConsoleAPIClient
+            from .display import ConsoleRenderer
+
+            self.admin_auth_manager = AdminAuthManager(self.credentials_path)
+            admin_key, _, _ = self.admin_auth_manager.load_admin_credentials()
+            self.console_client = ConsoleAPIClient(admin_key) if admin_key else None
+            self.console_renderer = ConsoleRenderer()
+        else:
+            # Code mode
+            self.oauth_manager = OAuthManager(self.credentials_path)
+            self.firefox_manager = FirefoxSessionManager()
+            self.api_client = ClaudeAPIClient()
+            self.renderer = UsageRenderer()
 
     def fetch_console_data(self):
         """Fetch all console data for MTD"""
