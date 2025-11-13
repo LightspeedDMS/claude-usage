@@ -267,7 +267,7 @@ class TestConsoleAPIClientFetchClaudeCodeAnalytics(unittest.TestCase):
 
     @patch("claude_usage.api.requests.get")
     def test_fetch_claude_code_analytics_returns_none_on_404(self, mock_get):
-        """Test that fetch_claude_code_analytics returns (None, None) on 404"""
+        """Test that fetch_claude_code_analytics returns None with error on 404"""
         mock_response = Mock()
         mock_response.status_code = 404
         mock_get.return_value = mock_response
@@ -275,10 +275,15 @@ class TestConsoleAPIClientFetchClaudeCodeAnalytics(unittest.TestCase):
         admin_key = "sk-ant-admin-test-key-12345"
         client = ConsoleAPIClient(admin_key)
 
-        result, error = client.fetch_claude_code_analytics("2025-01-01", "2025-01-31")
+        result, error = client.fetch_claude_code_analytics(
+            "2025-01-01",
+            "2025-01-31",
+            session_key="test-session-key",
+            org_uuid="test-org-uuid",
+        )
 
         self.assertIsNone(result)
-        self.assertIsNone(error)
+        self.assertEqual(error, "API error: 404")
 
 
 if __name__ == "__main__":

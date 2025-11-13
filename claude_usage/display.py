@@ -303,9 +303,17 @@ class ConsoleRenderer:
         period_label = mtd_data.get("period_label", "")
         content.append(Text(f"═══ Month-to-Date ({period_label}) ═══", style="bold"))
 
-        # Total cost line
+        # Total cost line with organization label
         total_cost = mtd_data.get("total_cost_usd", 0)
-        content.append(Text(f"Total Cost: {self._format_currency(total_cost)}"))
+        content.append(
+            Text(
+                f"Total Cost (Organization-Wide): {self._format_currency(total_cost)}",
+                style="yellow",
+            )
+        )
+        content.append(
+            Text("  ⓘ Shows all organization usage, not individual user", style="dim")
+        )
 
         # Progress bar if monthly_limit_usd exists
         monthly_limit = mtd_data.get("monthly_limit_usd")

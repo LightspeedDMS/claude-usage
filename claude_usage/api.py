@@ -280,9 +280,115 @@ class ConsoleAPIClient:
         aggregated = self.aggregate_cost_data(cost_data)
         return aggregated, None
 
-    def fetch_claude_code_analytics(self, starting_at, ending_at):
-        """Fetch Claude Code analytics"""
-        return None, None
+    def _extract_console_cookies(self, session_key):
+        """Extract all console.anthropic.com cookies from Firefox
+
+        The Console API requires multiple cookies including Cloudflare tokens.
+        """
+        import sqlite3
+        import tempfile
+        import shutil
+        from pathlib import Path
+
+        cookies_dict = {"sessionKey": session_key}
+
+        try:
+            # Find Firefox profile
+            firefox_dir = Path.home() / ".mozilla" / "firefox"
+            profiles = list(firefox_dir.glob("*.default*"))
+            if not profiles:
+                return cookies_dict
+
+            profile = profiles[0]
+            cookies_db = profile / "cookies.sqlite"
+
+            # Copy to temp file (Firefox locks the original)
+            temp_db = tempfile.mktemp(suffix=".sqlite")
+            shutil.copy2(cookies_db, temp_db)
+
+            try:
+                conn = sqlite3.connect(temp_db)
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT name, value FROM moz_cookies
+                    WHERE host LIKE '%console.anthropic.com%'
+                """
+                )
+
+                for name, value in cursor.fetchall():
+                    cookies_dict[name] = value
+
+                conn.close()
+            finally:
+                import os
+
+                os.unlink(temp_db)
+        except Exception:
+            # If extraction fails, just use sessionKey
+            pass
+
+        return cookies_dict
+
+    def fetch_claude_code_analytics(
+        self, starting_at, ending_at, session_key=None, org_uuid=None
+    ):
+        """Fetch Claude Code analytics from Console API
+
+        Requires session key from Firefox cookies to access Console API.
+        Returns user-specific Claude Code usage metrics.
+        """
+        if not session_key:
+            return None, "No session key available"
+
+        if not org_uuid:
+            return None, "Organization UUID required"
+
+        # Console API endpoint for Claude Code metrics
+        url = "https://console.anthropic.com/api/claude_code/metrics_aggs/users"
+
+        # Convert YYYY-MM-DD to YYYY-MM-DD format for console API
+        params = {
+            "start_date": starting_at,
+            "end_date": ending_at,
+            "limit": 10,
+            "offset": 0,
+            "sort_by": "total_lines_accepted",
+            "sort_order": "desc",
+            "organization_uuid": org_uuid,
+        }
+
+        headers = {
+            "accept": "*/*",
+            "content-type": "application/json",
+            "anthropic-client-platform": "web_console",
+            "referer": "https://console.anthropic.com/claude-code",
+            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+        }
+
+        # Extract all console.anthropic.com cookies from Firefox
+        cookies = self._extract_console_cookies(session_key)
+
+        try:
+            response = requests.get(
+                url, params=params, headers=headers, cookies=cookies, timeout=(5, 10)
+            )
+
+            if response.status_code == 401:
+                return None, "Session key expired or invalid"
+            elif response.status_code != 200:
+                return None, f"API error: {response.status_code}"
+
+            return response.json(), None
+        except requests.exceptions.Timeout:
+            return None, "Request timed out"
+        except requests.exceptions.RequestException as e:
+            return None, f"Network error: {e}"
+        except Exception as e:
+            return None, f"Failed to parse response: {e}"
 
 
 class ClaudeAPIClient:

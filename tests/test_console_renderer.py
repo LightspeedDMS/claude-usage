@@ -166,10 +166,16 @@ class TestConsoleRendererMTDSection:
         # Should contain cost
         all_text = " ".join(str(r) for r in renderables)
         assert "123.45" in all_text
-        # Should have a Progress bar (third element)
+        # Should have info message about organization-wide
+        assert (
+            "organization usage" in all_text.lower()
+            or "organization-wide" in all_text.lower()
+        )
+        # Should have a Progress bar (after header, cost, and info message)
         from rich.progress import Progress
 
-        assert isinstance(renderables[2], Progress)
+        progress_bars = [r for r in renderables if isinstance(r, Progress)]
+        assert len(progress_bars) > 0
 
     def test_render_mtd_without_limit_no_progress_bar(self):
         """Render MTD section without monthly limit - no progress bar"""
@@ -186,8 +192,8 @@ class TestConsoleRendererMTDSection:
         # Should return a Group
         assert isinstance(result, Group)
         renderables = list(result.renderables)
-        # Should have header and cost, but no progress bar
-        assert len(renderables) == 2
+        # Should have header, cost, and info message, but no progress bar
+        assert len(renderables) == 3
         # Verify no Progress object
         from rich.progress import Progress
 

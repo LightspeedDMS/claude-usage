@@ -11,7 +11,7 @@ from datetime import datetime
 from rich.live import Live
 from rich.console import Console
 
-from .auth import OAuthManager, FirefoxSessionManager
+from .auth import OAuthManager
 from .api import ClaudeAPIClient
 from .storage import UsageStorage, UsageAnalytics
 from .display import UsageRenderer
@@ -139,7 +139,7 @@ class ClaudeUsageMonitor:
     def _initialize_mode_components(self):
         """Initialize mode-specific components based on current mode"""
         if self.mode == "console":
-            from .auth import AdminAuthManager
+            from .auth import AdminAuthManager, FirefoxSessionManager
             from .api import ConsoleAPIClient
             from .display import ConsoleRenderer
 
@@ -147,8 +147,12 @@ class ClaudeUsageMonitor:
             admin_key, _, _ = self.admin_auth_manager.load_admin_credentials()
             self.console_client = ConsoleAPIClient(admin_key) if admin_key else None
             self.console_renderer = ConsoleRenderer()
+            # Firefox session manager for Claude Code analytics
+            self.firefox_manager = FirefoxSessionManager()
         else:
             # Code mode
+            from .auth import FirefoxSessionManager
+
             self.oauth_manager = OAuthManager(self.credentials_path)
             self.firefox_manager = FirefoxSessionManager()
             self.api_client = ClaudeAPIClient()
@@ -157,6 +161,11 @@ class ClaudeUsageMonitor:
     def fetch_console_data(self):
         """Fetch all console data for MTD"""
         if not hasattr(self, "console_client"):
+            self.error_message = "Console client not initialized"
+            return False
+
+        if self.console_client is None:
+            self.error_message = "Console client is None - admin API key not found"
             return False
 
         # Fetch organization
@@ -184,9 +193,16 @@ class ClaudeUsageMonitor:
         if error:
             self.error_message = error
 
-        # Optional: Claude Code analytics
+        # Optional: Claude Code analytics (requires Firefox session key)
+        session_key = None
+        if hasattr(self, "firefox_manager"):
+            session_key = self.firefox_manager.extract_session_key()
+
+        org_uuid = self.console_org_data.get("id") if self.console_org_data else None
         self.console_code_analytics, _ = (
-            self.console_client.fetch_claude_code_analytics(mtd_start, mtd_end)
+            self.console_client.fetch_claude_code_analytics(
+                mtd_start, mtd_end, session_key=session_key, org_uuid=org_uuid
+            )
         )
 
         # Store snapshot
