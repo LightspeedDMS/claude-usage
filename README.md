@@ -8,7 +8,7 @@ This tool continuously monitors your Claude Code account usage through the Claud
 
 ## Features
 
-- **Live Updates**: Continuously polls usage data every 10 seconds
+- **Live Updates**: Continuously polls usage data every 30 seconds
 - **Profile Information**: Display name, email, organization name
 - **Account Badges**: Shows Enterprise, Pro, or Max account status
 - **Rate Limit Tier**: Displays your current rate limit tier
@@ -242,7 +242,7 @@ Claude Code implements multiple rate limit windows:
 The monitor includes a sophisticated projection system that predicts overage costs:
 
 **How It Works:**
-1. **Data Collection**: Stores usage snapshots every 10 seconds to `~/.claude-usage/usage_history.db`
+1. **Data Collection**: Stores usage snapshots every 30 seconds to `~/.claude-usage/usage_history.db`
 2. **Rate Calculation**: Calculates spending rate from 30-minute historical window
 3. **Projection**: Projects total overage by reset time using formula: `current + (rate × hours_until_reset)`
 4. **Display**: Shows current overage, projected total, and hourly rate

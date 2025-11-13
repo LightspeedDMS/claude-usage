@@ -31,7 +31,7 @@ class ClaudeUsageMonitor:
     OVERAGE_ENDPOINT_TEMPLATE = "https://claude.ai/api/organizations/{org_uuid}/overage_spend_limits"
     REFRESH_ENDPOINT = "/v1/oauth/token"
 
-    POLL_INTERVAL = 10  # seconds
+    POLL_INTERVAL = 30  # seconds
     SESSION_REFRESH_INTERVAL = 300  # 5 minutes
     RATE_CALC_WINDOW = 1800  # 30 minutes for rate calculation
     HISTORY_RETENTION = 86400  # Keep 24 hours of history
