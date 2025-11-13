@@ -202,25 +202,39 @@ class ClaudeUsageMonitor:
         elif claude_code_user_data and self.mtd_cost:
             users_list = claude_code_user_data.get("users", [])
 
-            # Identify current user by matching system username against email addresses
-            current_user_email, email_error = (
-                self.console_client.get_current_user_email(usage_users=users_list)
-            )
+            # Get current user's email from Claude Code OAuth profile (most reliable)
+            current_user_email = None
+            if hasattr(self, "oauth_manager") and hasattr(self, "credentials"):
+                # Try Claude Code profile endpoint first
+                if self.credentials:
+                    headers = self.oauth_manager.get_auth_headers(self.credentials)
+                    from .api import ClaudeAPIClient
 
-            if current_user_email:
-                # Find current user's cost in the users list
-                current_user_cost = 0.0
-                for user in users_list:
-                    if user.get("email") == current_user_email:
-                        current_user_cost = user.get("cost_usd", 0.0)
-                        break
+                    temp_client = ClaudeAPIClient()
+                    profile_data, _, _, _ = temp_client.fetch_profile(headers)
+                    if profile_data:
+                        account = profile_data.get("account", {})
+                        current_user_email = account.get("email")
 
-                # Store ONLY current user's data
-                self.mtd_cost["claude_code_user_cost_usd"] = current_user_cost
-                self.mtd_cost["current_user_email"] = current_user_email
-            else:
-                # Store error if we couldn't identify user
-                self.error_message = email_error
+            # Fallback: Try Admin API user matching if OAuth didn't work
+            if not current_user_email:
+                current_user_email, email_error = (
+                    self.console_client.get_current_user_email(usage_users=users_list)
+                )
+                if not current_user_email:
+                    self.error_message = email_error
+                    return True
+
+            # Find current user's cost in the users list
+            current_user_cost = 0.0
+            for user in users_list:
+                if user.get("email") == current_user_email:
+                    current_user_cost = user.get("cost_usd", 0.0)
+                    break
+
+            # Store ONLY current user's data
+            self.mtd_cost["claude_code_user_cost_usd"] = current_user_cost
+            self.mtd_cost["current_user_email"] = current_user_email
 
         # Optional: Claude Code analytics (requires Firefox session key)
         session_key = None
