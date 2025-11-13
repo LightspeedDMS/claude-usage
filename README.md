@@ -83,8 +83,8 @@ Claude Code Usage Monitor
 Press Ctrl+C to stop
 
 ┌ Claude Code Usage ──────────────────────────┐
-│ 👤 Seba (seba.battig@example.com)           │
-│ 🏢 Lightspeed DMS LLC ENTERPRISE            │
+│ 👤 User (user@example.com)                  │
+│ 🏢 Company Name ENTERPRISE                  │
 │ ⚡ Tier: default_claude_max_5x              │
 │                                             │
 │ 5-Hour Limit: ████████████████░░ 96%       │
