@@ -59,23 +59,20 @@ class TestUsageStorage:
 
         assert "timestamp" in columns
         assert "mtd_cost" in columns
-        assert "ytd_cost" in columns
         assert "workspace_costs_json" in columns
         assert columns["timestamp"] == "INTEGER"
         assert columns["mtd_cost"] == "REAL"
-        assert columns["ytd_cost"] == "REAL"
         assert columns["workspace_costs_json"] == "TEXT"
 
     def test_store_console_snapshot_success(self, storage, temp_db):
         """Test store_console_snapshot inserts data correctly"""
         mtd_data = {"total_cost_usd": 12.50}
-        ytd_data = {"total_cost_usd": 150.75}
         workspaces = [
             {"name": "workspace1", "cost": 10.0},
             {"name": "workspace2", "cost": 2.5},
         ]
 
-        result = storage.store_console_snapshot(mtd_data, ytd_data, workspaces)
+        result = storage.store_console_snapshot(mtd_data, workspaces)
 
         assert result is True
 
@@ -87,9 +84,8 @@ class TestUsageStorage:
         conn.close()
 
         assert row is not None
-        timestamp, mtd_cost, ytd_cost, workspace_json = row
+        timestamp, mtd_cost, workspace_json = row
         assert mtd_cost == 12.50
-        assert ytd_cost == 150.75
 
         # Verify JSON deserialization
         parsed_workspaces = json.loads(workspace_json)
@@ -100,9 +96,8 @@ class TestUsageStorage:
     def test_store_console_snapshot_with_none_workspaces(self, storage, temp_db):
         """Test store_console_snapshot handles None workspace data gracefully"""
         mtd_data = {"total_cost_usd": 5.0}
-        ytd_data = {"total_cost_usd": 50.0}
 
-        result = storage.store_console_snapshot(mtd_data, ytd_data, None)
+        result = storage.store_console_snapshot(mtd_data, None)
 
         assert result is True
 
@@ -125,18 +120,17 @@ class TestUsageStorage:
         cursor.execute(
             """
             INSERT INTO console_usage_snapshots
-            (timestamp, mtd_cost, ytd_cost, workspace_costs_json)
-            VALUES (?, ?, ?, ?)
+            (timestamp, mtd_cost, workspace_costs_json)
+            VALUES (?, ?, ?)
         """,
-            (old_timestamp, 1.0, 10.0, "[]"),
+            (old_timestamp, 1.0, "[]"),
         )
         conn.commit()
         conn.close()
 
         # Store new snapshot
         mtd_data = {"total_cost_usd": 5.0}
-        ytd_data = {"total_cost_usd": 50.0}
-        storage.store_console_snapshot(mtd_data, ytd_data, [])
+        storage.store_console_snapshot(mtd_data, [])
 
         # Verify old snapshot was deleted
         conn = sqlite3.connect(temp_db)
@@ -150,15 +144,7 @@ class TestUsageStorage:
     def test_store_console_snapshot_handles_missing_data(self, storage):
         """Test store_console_snapshot returns False for invalid data"""
         # None mtd_data
-        result = storage.store_console_snapshot(None, {"total_cost_usd": 10}, [])
-        assert result is False
-
-        # None ytd_data
-        result = storage.store_console_snapshot({"total_cost_usd": 10}, None, [])
-        assert result is False
-
-        # Both None
-        result = storage.store_console_snapshot(None, None, [])
+        result = storage.store_console_snapshot(None, [])
         assert result is False
 
 
@@ -197,10 +183,10 @@ class TestUsageAnalytics:
         cursor.execute(
             """
             INSERT INTO console_usage_snapshots
-            (timestamp, mtd_cost, ytd_cost, workspace_costs_json)
-            VALUES (?, ?, ?, ?)
+            (timestamp, mtd_cost, workspace_costs_json)
+            VALUES (?, ?, ?)
         """,
-            (old_timestamp, 10.0, 100.0, "[]"),
+            (old_timestamp, 10.0, "[]"),
         )
         conn.commit()
         conn.close()
@@ -227,10 +213,10 @@ class TestUsageAnalytics:
         cursor.execute(
             """
             INSERT INTO console_usage_snapshots
-            (timestamp, mtd_cost, ytd_cost, workspace_costs_json)
-            VALUES (?, ?, ?, ?)
+            (timestamp, mtd_cost, workspace_costs_json)
+            VALUES (?, ?, ?)
         """,
-            (old_timestamp, 10.0, 100.0, "[]"),
+            (old_timestamp, 10.0, "[]"),
         )
         conn.commit()
         conn.close()

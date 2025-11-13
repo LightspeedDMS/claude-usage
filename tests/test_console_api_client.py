@@ -60,21 +60,6 @@ class TestConsoleAPIClientDateHelpers(unittest.TestCase):
         self.assertEqual(starting_at, "2025-11-01")
         self.assertEqual(ending_at, "2025-11-12")
 
-    @patch("claude_usage.api.date")
-    def test_calculate_ytd_range_returns_year_to_date_range(self, mock_date):
-        """Test that _calculate_ytd_range returns correct year-to-date range"""
-        # Mock today's date as November 12, 2025
-        mock_date.today.return_value = date(2025, 11, 12)
-        mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
-
-        admin_key = "sk-ant-admin-test-key-12345"
-        client = ConsoleAPIClient(admin_key)
-
-        starting_at, ending_at = client._calculate_ytd_range()
-
-        self.assertEqual(starting_at, "2025-01-01")
-        self.assertEqual(ending_at, "2025-11-12")
-
 
 class TestConsoleAPIClientFetchOrganization(unittest.TestCase):
     """Test cases for fetch_organization method"""

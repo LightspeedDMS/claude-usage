@@ -52,7 +52,6 @@ class UsageStorage:
                 CREATE TABLE IF NOT EXISTS console_usage_snapshots (
                     timestamp INTEGER PRIMARY KEY,
                     mtd_cost REAL,
-                    ytd_cost REAL,
                     workspace_costs_json TEXT
                 )
             """
@@ -108,16 +107,15 @@ class UsageStorage:
             )
             return False  # Non-fatal
 
-    def store_console_snapshot(self, mtd_data, ytd_data, workspaces):
+    def store_console_snapshot(self, mtd_data, workspaces):
         """Store console usage snapshot to database"""
-        if not mtd_data or not ytd_data:
+        if not mtd_data:
             return False
 
         import json
 
         timestamp = int(datetime.now().timestamp())
         mtd_cost = mtd_data.get("total_cost_usd", 0)
-        ytd_cost = ytd_data.get("total_cost_usd", 0)
         workspace_json = json.dumps(workspaces)
 
         conn = sqlite3.connect(self.db_path)
@@ -127,10 +125,10 @@ class UsageStorage:
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO console_usage_snapshots
-                (timestamp, mtd_cost, ytd_cost, workspace_costs_json)
-                VALUES (?, ?, ?, ?)
+                (timestamp, mtd_cost, workspace_costs_json)
+                VALUES (?, ?, ?)
             """,
-                (timestamp, mtd_cost, ytd_cost, workspace_json),
+                (timestamp, mtd_cost, workspace_json),
             )
 
             # Clean old data (keep only last 24 hours)

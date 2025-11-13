@@ -100,9 +100,7 @@ class TestCostDataAggregation(unittest.TestCase):
             {
                 "starting_at": "2025-01-01T00:00:00Z",
                 "ending_at": "2025-01-01T23:59:59Z",
-                "results": [
-                    {"currency": "EUR", "amount": "100.00"}  # Non-USD
-                ],
+                "results": [{"currency": "EUR", "amount": "100.00"}],  # Non-USD
             }
         ]
 
@@ -135,9 +133,7 @@ class TestCostDataAggregation(unittest.TestCase):
             {
                 "starting_at": "2025-01-01T00:00:00Z",
                 "ending_at": "2025-01-01T23:59:59Z",
-                "results": [
-                    {"currency": "USD", "amount": "invalid"}  # Invalid format
-                ],
+                "results": [{"currency": "USD", "amount": "invalid"}],  # Invalid format
             }
         ]
 

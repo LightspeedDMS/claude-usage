@@ -30,7 +30,7 @@ class TestFetchConsoleData:
         """
         GIVEN monitor initialized in console mode
         WHEN fetch_console_data() is called
-        THEN it should fetch organization, workspaces, MTD, and YTD data
+        THEN it should fetch organization, workspaces, and MTD data
         """
         with patch.dict(
             "os.environ", {"ANTHROPIC_ADMIN_API_KEY": "sk-ant-admin01-test-key"}
@@ -49,22 +49,13 @@ class TestFetchConsoleData:
             monitor.console_client._calculate_mtd_range = Mock(
                 return_value=(datetime(2025, 11, 1), datetime(2025, 11, 15))
             )
-            monitor.console_client._calculate_ytd_range = Mock(
-                return_value=(datetime(2025, 1, 1), datetime(2025, 11, 15))
-            )
 
-            # Mock report fetches
+            # Mock report fetches (only MTD now)
             monitor.console_client.fetch_usage_report = Mock(
-                side_effect=[
-                    ({"total_tokens": 1000000}, None),  # MTD usage
-                    ({"total_tokens": 5000000}, None),  # YTD usage
-                ]
+                return_value=({"total_tokens": 1000000}, None)  # MTD usage
             )
             monitor.console_client.fetch_cost_report = Mock(
-                side_effect=[
-                    ({"total_cost_usd": 50.00}, None),  # MTD cost
-                    ({"total_cost_usd": 250.00}, None),  # YTD cost
-                ]
+                return_value=({"total_cost_usd": 50.00}, None)  # MTD cost
             )
 
             # Mock optional analytics
@@ -84,8 +75,9 @@ class TestFetchConsoleData:
             assert monitor.console_workspaces == [{"id": "ws_1", "name": "Workspace 1"}]
             assert monitor.mtd_usage == {"total_tokens": 1000000}
             assert monitor.mtd_cost == {"total_cost_usd": 50.00}
-            assert monitor.ytd_usage == {"total_tokens": 5000000}
-            assert monitor.ytd_cost == {"total_cost_usd": 250.00}
+            # YTD data should NOT exist
+            assert not hasattr(monitor, "ytd_usage")
+            assert not hasattr(monitor, "ytd_cost")
             assert monitor.console_code_analytics == {"code_sessions": 100}
             assert monitor.last_update is not None
             monitor.storage.store_console_snapshot.assert_called_once()
@@ -186,7 +178,6 @@ class TestGetConsoleDisplay:
             # Mock data
             monitor.console_org_data = {"id": "org_123", "name": "Test Org"}
             monitor.mtd_cost = {"total_cost_usd": 50.00}
-            monitor.ytd_cost = {"total_cost_usd": 250.00}
             monitor.console_workspaces = [{"id": "ws_1", "name": "Workspace 1"}]
             monitor.last_update = datetime.now()
 
@@ -205,7 +196,6 @@ class TestGetConsoleDisplay:
             monitor.console_renderer.render.assert_called_once_with(
                 monitor.console_org_data,
                 monitor.mtd_cost,
-                monitor.ytd_cost,
                 monitor.console_workspaces,
                 monitor.last_update,
                 None,  # No projection
@@ -236,7 +226,6 @@ class TestGetConsoleDisplay:
                 # Mock data
                 monitor.console_org_data = {"id": "org_123", "name": "Test Org"}
                 monitor.mtd_cost = {"total_cost_usd": 50.00}
-                monitor.ytd_cost = {"total_cost_usd": 250.00}
                 monitor.console_workspaces = [{"id": "ws_1", "name": "Workspace 1"}]
                 monitor.last_update = mock_now
 
@@ -261,7 +250,7 @@ class TestGetConsoleDisplay:
 
                 # Verify renderer called with projection
                 call_args = monitor.console_renderer.render.call_args[0]
-                projection = call_args[5]
+                projection = call_args[4]
                 assert projection is not None
                 assert projection["projected_eom_cost"] == 150.00
                 assert projection["rate_per_hour"] == 2.5

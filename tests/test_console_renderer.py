@@ -1,4 +1,4 @@
-"""Tests for ConsoleRenderer - MTD/YTD display with Rich UI"""
+"""Tests for ConsoleRenderer - MTD display with Rich UI"""
 
 from datetime import datetime
 from claude_usage.display import ConsoleRenderer
@@ -233,57 +233,6 @@ class TestConsoleRendererMTDSection:
         assert "8.50" in all_text
 
 
-class TestConsoleRendererYTDSection:
-    """Test YTD section rendering"""
-
-    def test_render_ytd_complete_data_with_models(self):
-        """Render YTD section with complete data"""
-        renderer = ConsoleRenderer()
-        ytd_data = {
-            "period_label": "2025",
-            "total_cost_usd": 2456.78,
-            "by_model": {
-                "claude-sonnet-4-5": {
-                    "input_tokens": 5000000,
-                    "output_tokens": 1000000,
-                    "cost_usd": 1200.00,
-                }
-            },
-            "claude_code": {"sessions": 150, "cost_usd": 100.50},
-        }
-
-        result = renderer._render_ytd_section(ytd_data)
-
-        # Should return a Group
-        assert isinstance(result, Group)
-        renderables = list(result.renderables)
-        assert len(renderables) > 0
-        # Should contain year in header
-        all_text = " ".join(str(r) for r in renderables)
-        assert "2025" in all_text
-        assert "2,456.78" in all_text
-        assert "claude-sonnet-4-5" in all_text
-        assert "Claude Code" in all_text
-
-    def test_render_ytd_without_claude_code(self):
-        """Render YTD section without claude_code data"""
-        renderer = ConsoleRenderer()
-        ytd_data = {
-            "period_label": "2025",
-            "total_cost_usd": 1500.00,
-            "by_model": {},
-        }
-
-        result = renderer._render_ytd_section(ytd_data)
-
-        renderables = list(result.renderables)
-        all_text = " ".join(str(r) for r in renderables)
-        # Should NOT contain Claude Code mention
-        assert "Claude Code" not in all_text
-        # Should still have cost
-        assert "1,500.00" in all_text
-
-
 class TestConsoleRendererWorkspaces:
     """Test workspace rendering"""
 
@@ -324,13 +273,12 @@ class TestConsoleRendererMainRender:
             "monthly_limit_usd": 1000.00,
             "by_model": {},
         }
-        ytd_data = {"period_label": "2025", "total_cost_usd": 500.00, "by_model": {}}
         workspaces = []
         last_update = datetime(2025, 11, 12, 10, 30, 0)
         projection = None
 
         result = renderer.render(
-            org_data, mtd_data, ytd_data, workspaces, last_update, projection
+            org_data, mtd_data, workspaces, last_update, projection
         )
 
         # Should return a Panel

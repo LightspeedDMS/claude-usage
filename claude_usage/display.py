@@ -202,13 +202,12 @@ class UsageRenderer:
 
 
 class ConsoleRenderer:
-    """Renders Console API usage data with MTD/YTD display"""
+    """Renders Console API usage data with MTD display"""
 
     def render(
         self,
         org_data,
         mtd_data,
-        ytd_data,
         workspaces,
         last_update,
         projection,
@@ -228,12 +227,6 @@ class ConsoleRenderer:
             mtd_content = self._render_mtd_section(mtd_data, projection)
             content.append(mtd_content)
 
-        # YTD section
-        if ytd_data and not error:
-            content.append(Text(""))
-            ytd_content = self._render_ytd_section(ytd_data)
-            content.append(ytd_content)
-
         # Workspaces section
         if workspaces and not error:
             content.append(Text(""))
@@ -245,6 +238,10 @@ class ConsoleRenderer:
             content.append(Text(""))
             content.append(Text(f"⚠️  {error}", style="bold red"))
             content.append(Text(""))
+
+        # Show loading message if no content yet
+        if not content:
+            content.append(Text("Loading...", style="dim"))
 
         # Combine content
         display = Group(*content)
@@ -346,37 +343,6 @@ class ConsoleRenderer:
                     f"Projected EOM: {self._format_currency(projected_eom)} at {self._format_currency(rate)}/hour",
                     style="cyan",
                 )
-            )
-
-        return Group(*content)
-
-    def _render_ytd_section(self, ytd_data):
-        """Render year-to-date section with cost and model breakdown"""
-        content = []
-
-        # Section header with year
-        period_label = ytd_data.get("period_label", "")
-        content.append(Text(f"═══ Year-to-Date ({period_label}) ═══", style="bold"))
-
-        # Total cost line
-        total_cost = ytd_data.get("total_cost_usd", 0)
-        content.append(Text(f"Total Cost: {self._format_currency(total_cost)}"))
-
-        # Model breakdown (NO progress bar for YTD)
-        models = ytd_data.get("by_model", {})
-        if models:
-            content.append(Text(""))  # spacing
-            model_lines = self._render_model_breakdown(models, "YTD")
-            content.extend(model_lines)
-
-        # Claude Code if exists
-        claude_code = ytd_data.get("claude_code")
-        if claude_code:
-            sessions = claude_code.get("sessions", 0)
-            cost = claude_code.get("cost_usd", 0)
-            content.append(Text(""))  # spacing
-            content.append(
-                Text(f"Claude Code: {sessions} sessions, {self._format_currency(cost)}")
             )
 
         return Group(*content)

@@ -4,7 +4,7 @@
 
 Live-updating terminal dashboard for monitoring Claude Code and Anthropic Console account usage. Supports dual-mode operation:
 - **Code Mode**: 5-hour rate limits, monthly overage tracking, projection system (30-second polling)
-- **Console Mode**: Organization-wide usage, MTD/YTD cost tracking, per-model breakdowns (2-minute polling)
+- **Console Mode**: Organization-wide usage, MTD cost tracking, per-model breakdowns (2-minute polling)
 
 ## Architecture
 
@@ -17,7 +17,7 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 
 - **api.py**: API client wrapper
   - `ClaudeAPIClient`: Code mode - Usage, profile, and overage endpoints
-  - `ConsoleAPIClient`: Console mode - Organization, workspaces, MTD/YTD reports
+  - `ConsoleAPIClient`: Console mode - Organization, workspaces, MTD reports
 
 - **storage.py**: Database and analytics
   - `UsageStorage`: SQLite operations for both Code and Console snapshots
@@ -25,7 +25,7 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 
 - **display.py**: UI rendering
   - `UsageRenderer`: Code mode - 5-hour limits, overage display
-  - `ConsoleRenderer`: Console mode - MTD/YTD, model breakdowns, workspaces
+  - `ConsoleRenderer`: Console mode - MTD, model breakdowns, workspaces
 
 - **monitor.py**: Main orchestration
   - Dual-mode support with automatic detection
@@ -45,7 +45,7 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 ### Console Mode
 - **Admin API Key**: Environment variable or credentials file
 - **Mode Detection**: Automatic based on Admin API key presence
-- **MTD/YTD Tracking**: Month-to-date and year-to-date cost reports
+- **MTD Tracking**: Month-to-date cost reports
 - **Model Breakdown**: Per-model usage (Sonnet, Opus, Haiku) with token counts
 - **Workspace Limits**: Spending vs limits for each workspace
 - **Error Display**: Rate limits and API errors shown prominently
@@ -62,7 +62,7 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 
 ### Console Mode
 1. Admin API key → organization/workspaces/reports APIs
-2. MTD/YTD date ranges calculated automatically
+2. MTD date ranges calculated automatically
 3. Console snapshots stored to database every 2 minutes
 4. Rate calculated for end-of-month projection
 5. Errors displayed with red border and warning messages

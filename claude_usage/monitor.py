@@ -74,8 +74,6 @@ class ClaudeUsageMonitor:
         self.console_workspaces = None
         self.mtd_usage = None
         self.mtd_cost = None
-        self.ytd_usage = None
-        self.ytd_cost = None
         self.console_code_analytics = None
 
         self.error_message = None
@@ -128,7 +126,7 @@ class ClaudeUsageMonitor:
         return self.detect_mode()
 
     def fetch_console_data(self):
-        """Fetch all console data for MTD and YTD"""
+        """Fetch all console data for MTD"""
         if not hasattr(self, "console_client"):
             return False
 
@@ -143,9 +141,8 @@ class ClaudeUsageMonitor:
         if error:
             self.error_message = error
 
-        # Calculate date ranges
+        # Calculate MTD date range
         mtd_start, mtd_end = self.console_client._calculate_mtd_range()
-        ytd_start, ytd_end = self.console_client._calculate_ytd_range()
 
         # Fetch MTD data
         self.mtd_usage, error = self.console_client.fetch_usage_report(
@@ -158,27 +155,14 @@ class ClaudeUsageMonitor:
         if error:
             self.error_message = error
 
-        # Fetch YTD data
-        self.ytd_usage, error = self.console_client.fetch_usage_report(
-            ytd_start, ytd_end
-        )
-        if error:
-            self.error_message = error
-
-        self.ytd_cost, error = self.console_client.fetch_cost_report(ytd_start, ytd_end)
-        if error:
-            self.error_message = error
-
         # Optional: Claude Code analytics
         self.console_code_analytics, _ = (
             self.console_client.fetch_claude_code_analytics(mtd_start, mtd_end)
         )
 
         # Store snapshot
-        if self.mtd_cost and self.ytd_cost:
-            self.storage.store_console_snapshot(
-                self.mtd_cost, self.ytd_cost, self.console_workspaces
-            )
+        if self.mtd_cost:
+            self.storage.store_console_snapshot(self.mtd_cost, self.console_workspaces)
 
         self.last_update = datetime.now()
         return True
@@ -221,7 +205,6 @@ class ClaudeUsageMonitor:
         return self.console_renderer.render(
             self.console_org_data,
             self.mtd_cost,
-            self.ytd_cost,
             self.console_workspaces,
             self.last_update,
             projection,
@@ -367,6 +350,11 @@ def main():
 
         with Live(refresh_per_second=1, console=console) as live:
             while True:
+                # Show initial display before fetching
+                display = monitor.get_display()
+                instruction = Text("Press Ctrl+C to stop", style="dim")
+                live.update(Group(display, Text(""), instruction))
+
                 # Route to appropriate fetch method based on mode
                 if mode == "console":
                     monitor.fetch_console_data()
@@ -384,7 +372,7 @@ def main():
                         if monitor.last_overage:
                             monitor.store_snapshot()
 
-                # Update display with instruction below
+                # Update display again after fetching
                 display = monitor.get_display()
                 instruction = Text("Press Ctrl+C to stop", style="dim")
                 live.update(Group(display, Text(""), instruction))

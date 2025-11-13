@@ -29,12 +29,6 @@ class ConsoleAPIClient:
         starting_at = date(today.year, today.month, 1)
         return starting_at.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
 
-    def _calculate_ytd_range(self):
-        """Calculate Year-to-Date date range"""
-        today = date.today()
-        starting_at = date(today.year, 1, 1)
-        return starting_at.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
-
     def fetch_organization(self):
         """Fetch organization data from Console API
 
