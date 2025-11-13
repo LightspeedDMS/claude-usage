@@ -26,20 +26,24 @@ class UsageStorage:
             cursor = conn.cursor()
 
             # Create table if not exists
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS usage_snapshots (
                     timestamp INTEGER PRIMARY KEY,
                     credits_used INTEGER,
                     utilization_percent REAL,
                     resets_at TEXT
                 )
-            """)
+            """
+            )
 
             # Create index for efficient queries
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_timestamp
                 ON usage_snapshots(timestamp DESC)
-            """)
+            """
+            )
 
             conn.commit()
             conn.close()
@@ -63,11 +67,14 @@ class UsageStorage:
             cursor = conn.cursor()
 
             # Insert snapshot
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO usage_snapshots
                 (timestamp, credits_used, utilization_percent, resets_at)
                 VALUES (?, ?, ?, ?)
-            """, (timestamp, credits_used, utilization, resets_at))
+            """,
+                (timestamp, credits_used, utilization, resets_at),
+            )
 
             # Clean old data (keep only last 24 hours)
             cutoff = timestamp - self.HISTORY_RETENTION
@@ -95,13 +102,16 @@ class UsageStorage:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT timestamp, credits_used
                 FROM usage_snapshots
                 WHERE timestamp >= ?
                 ORDER BY timestamp ASC
                 LIMIT 1
-            """, (cutoff,))
+            """,
+                (cutoff,),
+            )
 
             result = cursor.fetchone()
             conn.close()
@@ -164,10 +174,10 @@ class UsageAnalytics:
             projected_credits = current_credits + (rate * hours_until_reset)
 
             return {
-                'current_credits': current_credits,
-                'projected_credits': projected_credits,
-                'rate_per_hour': rate,
-                'hours_until_reset': hours_until_reset
+                "current_credits": current_credits,
+                "projected_credits": projected_credits,
+                "rate_per_hour": rate,
+                "hours_until_reset": hours_until_reset,
             }
 
         except Exception:

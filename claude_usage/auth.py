@@ -36,7 +36,7 @@ class OAuthManager:
 
             data["claudeAiOauth"] = credentials
 
-            with open(self.credentials_path, 'w') as f:
+            with open(self.credentials_path, "w") as f:
                 json.dump(data, f, indent=2)
 
             return True, None
@@ -75,10 +75,10 @@ class OAuthManager:
             return None
 
         return {
-            'Authorization': f'Bearer {credentials["accessToken"]}',
-            'Content-Type': 'application/json',
-            'anthropic-beta': 'oauth-2025-04-20',
-            'User-Agent': 'claude-code/2.0.37'
+            "Authorization": f'Bearer {credentials["accessToken"]}',
+            "Content-Type": "application/json",
+            "anthropic-beta": "oauth-2025-04-20",
+            "User-Agent": "claude-code/2.0.37",
         }
 
 
@@ -104,7 +104,7 @@ class FirefoxSessionManager:
                     continue
 
                 # Copy database (Firefox locks it when running)
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.sqlite') as tmp:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".sqlite") as tmp:
                     tmp_path = tmp.name
 
                 try:
@@ -113,13 +113,15 @@ class FirefoxSessionManager:
                     cursor = conn.cursor()
 
                     # Query for sessionKey cookie
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         SELECT value, expiry
                         FROM moz_cookies
                         WHERE host LIKE '%claude.ai%' AND name = 'sessionKey'
                         ORDER BY expiry DESC
                         LIMIT 1
-                    """)
+                    """
+                    )
 
                     result = cursor.fetchone()
                     conn.close()

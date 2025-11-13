@@ -49,3 +49,4 @@ Live-updating terminal dashboard for monitoring Claude Code account usage and ov
 - **SQLite**: Local usage history storage
 - **Requests**: HTTP client for API calls
 - **Python 3.6+**: Core language
+# Test

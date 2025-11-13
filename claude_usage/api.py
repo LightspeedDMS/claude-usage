@@ -9,7 +9,9 @@ class ClaudeAPIClient:
     API_BASE = "https://api.anthropic.com"
     USAGE_ENDPOINT = "/api/oauth/usage"
     PROFILE_ENDPOINT = "/api/oauth/profile"
-    OVERAGE_ENDPOINT_TEMPLATE = "https://claude.ai/api/organizations/{org_uuid}/overage_spend_limits"
+    OVERAGE_ENDPOINT_TEMPLATE = (
+        "https://claude.ai/api/organizations/{org_uuid}/overage_spend_limits"
+    )
 
     def fetch_usage(self, auth_headers):
         """Fetch current usage data from Claude Code API"""
@@ -48,10 +50,10 @@ class ClaudeAPIClient:
                 org_uuid = None
                 account_uuid = None
                 if profile_data:
-                    org = profile_data.get('organization', {})
-                    account = profile_data.get('account', {})
-                    org_uuid = org.get('uuid')
-                    account_uuid = account.get('uuid')
+                    org = profile_data.get("organization", {})
+                    account = profile_data.get("account", {})
+                    org_uuid = org.get("uuid")
+                    account_uuid = account.get("uuid")
 
                 return profile_data, org_uuid, account_uuid, None
             else:
@@ -68,29 +70,28 @@ class ClaudeAPIClient:
         url = self.OVERAGE_ENDPOINT_TEMPLATE.format(org_uuid=org_uuid)
 
         headers = {
-            'accept': '*/*',
-            'content-type': 'application/json',
-            'user-agent': 'Mozilla/5.0',
+            "accept": "*/*",
+            "content-type": "application/json",
+            "user-agent": "Mozilla/5.0",
         }
 
         cookies = {
-            'sessionKey': session_key,
+            "sessionKey": session_key,
         }
 
-        params = {
-            'page': 1,
-            'per_page': 100
-        }
+        params = {"page": 1, "per_page": 100}
 
         try:
-            response = requests.get(url, headers=headers, cookies=cookies, params=params, timeout=10)
+            response = requests.get(
+                url, headers=headers, cookies=cookies, params=params, timeout=10
+            )
 
             if response.status_code == 200:
                 data = response.json()
                 # Find current user's overage data
-                if 'items' in data and account_uuid:
-                    for item in data['items']:
-                        if item.get('account_uuid') == account_uuid:
+                if "items" in data and account_uuid:
+                    for item in data["items"]:
+                        if item.get("account_uuid") == account_uuid:
                             return item, None
                 return None, "No overage data found"
             else:

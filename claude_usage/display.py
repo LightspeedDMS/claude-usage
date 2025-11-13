@@ -10,21 +10,29 @@ from rich.console import Group
 class UsageRenderer:
     """Renders usage data using Rich library"""
 
-    def render(self, error_message, last_usage, last_profile, last_overage, last_update, projection):
+    def render(
+        self,
+        error_message,
+        last_usage,
+        last_profile,
+        last_overage,
+        last_update,
+        projection,
+    ):
         """Generate rich display for current usage"""
 
         if error_message:
             return Panel(
                 f"[red]⚠ {error_message}[/red]",
                 title="Claude Code Usage",
-                border_style="red"
+                border_style="red",
             )
 
         if not last_usage:
             return Panel(
                 "[yellow]Fetching usage data...[/yellow]",
                 title="Claude Code Usage",
-                border_style="yellow"
+                border_style="yellow",
             )
 
         # Build display content
@@ -60,11 +68,7 @@ class UsageRenderer:
         # Combine content
         display = Group(*content)
 
-        return Panel(
-            display,
-            title="Claude Code Usage",
-            border_style="green"
-        )
+        return Panel(display, title="Claude Code Usage", border_style="green")
 
     def _render_profile(self, content, profile):
         """Render profile information"""
@@ -118,10 +122,15 @@ class UsageRenderer:
         # Progress bar
         progress = Progress(
             TextColumn("[bold]5-Hour Limit:[/bold]"),
-            BarColumn(bar_width=20, style=bar_style, complete_style=bar_style, finished_style=bar_style),
+            BarColumn(
+                bar_width=20,
+                style=bar_style,
+                complete_style=bar_style,
+                finished_style=bar_style,
+            ),
             TextColumn("[bold]{task.percentage:>3.0f}%[/bold]"),
         )
-        task = progress.add_task("usage", total=100, completed=utilization)
+        _ = progress.add_task("usage", total=100, completed=utilization)
 
         content.append(progress)
 
@@ -144,7 +153,7 @@ class UsageRenderer:
             BarColumn(bar_width=20),
             TextColumn("[bold]{task.percentage:>3.0f}%[/bold]"),
         )
-        task = progress.add_task("usage", total=100, completed=utilization)
+        _ = progress.add_task("usage", total=100, completed=utilization)
         content.append(Text(""))  # spacing
         content.append(progress)
 
@@ -167,18 +176,27 @@ class UsageRenderer:
                     BarColumn(bar_width=20),
                     TextColumn("[bold]${task.completed:.2f}/${task.total:.2f}[/bold]"),
                 )
-                task = progress.add_task("overage", total=limit_dollars, completed=used_dollars)
+                _ = progress.add_task(
+                    "overage", total=limit_dollars, completed=used_dollars
+                )
                 content.append(progress)
             else:
                 # No limit, just show used dollars
-                content.append(Text(f"💳 Overage: ${used_dollars:.2f}", style="bold yellow"))
+                content.append(
+                    Text(f"💳 Overage: ${used_dollars:.2f}", style="bold yellow")
+                )
 
             # Projection display - only show when currently in overage (utilization >= 100)
             if projection and utilization >= 100:
-                current_dollars = projection['current_credits'] / 100
-                projected_dollars = projection['projected_credits'] / 100
-                rate_dollars = projection['rate_per_hour'] / 100
+                current_dollars = projection["current_credits"] / 100
+                projected_dollars = projection["projected_credits"] / 100
+                rate_dollars = projection["rate_per_hour"] / 100
                 increase = projected_dollars - current_dollars
 
-                content.append(Text(f"📊 Projected by reset: ${projected_dollars:.2f} (+${increase:.2f})", style="cyan"))
+                content.append(
+                    Text(
+                        f"📊 Projected by reset: ${projected_dollars:.2f} (+${increase:.2f})",
+                        style="cyan",
+                    )
+                )
                 content.append(Text(f"📈 Rate: ${rate_dollars:.2f}/hour", style="dim"))

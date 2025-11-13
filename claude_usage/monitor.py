@@ -97,7 +97,9 @@ class ClaudeUsageMonitor:
             return False
 
         headers = self.oauth_manager.get_auth_headers(self.credentials)
-        profile_data, org_uuid, account_uuid, error = self.api_client.fetch_profile(headers)
+        profile_data, org_uuid, account_uuid, error = self.api_client.fetch_profile(
+            headers
+        )
 
         if profile_data:
             self.last_profile = profile_data
@@ -115,9 +117,7 @@ class ClaudeUsageMonitor:
             return False
 
         overage_data, error = self.api_client.fetch_overage(
-            self.org_uuid,
-            self.account_uuid,
-            self.session_key
+            self.org_uuid, self.account_uuid, self.session_key
         )
 
         if overage_data:
@@ -141,7 +141,9 @@ class ClaudeUsageMonitor:
         """Generate rich display for current usage"""
         projection = None
         if self.last_overage and self.last_usage:
-            projection = self.analytics.project_usage(self.last_overage, self.last_usage)
+            projection = self.analytics.project_usage(
+                self.last_overage, self.last_usage
+            )
 
         return self.renderer.render(
             self.error_message,
@@ -149,7 +151,7 @@ class ClaudeUsageMonitor:
             self.last_profile,
             self.last_overage,
             self.last_update,
-            projection
+            projection,
         )
 
 
@@ -168,9 +170,13 @@ def main():
     if session_key:
         monitor.session_key = session_key
         monitor.firefox_manager.last_refresh = datetime.now()
-        console.print("[dim]✓ Firefox session key detected - overage data enabled[/dim]\n")
+        console.print(
+            "[dim]✓ Firefox session key detected - overage data enabled[/dim]\n"
+        )
     else:
-        console.print("[dim]ℹ Firefox session not found - overage data unavailable[/dim]\n")
+        console.print(
+            "[dim]ℹ Firefox session not found - overage data unavailable[/dim]\n"
+        )
 
     try:
         with Live(monitor.get_display(), refresh_per_second=1, console=console) as live:
