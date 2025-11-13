@@ -224,7 +224,7 @@ class ConsoleRenderer:
         # MTD section - ONLY current user's Claude Code usage
         if mtd_data and not error:
             content.append(Text(""))
-            mtd_content = self._render_mtd_section(mtd_data, projection)
+            mtd_content = self._render_mtd_section(mtd_data, projection, last_update)
             content.append(mtd_content)
 
         # Show errors prominently
@@ -289,7 +289,7 @@ class ConsoleRenderer:
 
         return result
 
-    def _render_mtd_section(self, mtd_data, projection):
+    def _render_mtd_section(self, mtd_data, projection, last_update=None):
         """Render month-to-date section showing ONLY current user's Claude Code usage"""
         content = []
 
@@ -318,6 +318,12 @@ class ConsoleRenderer:
                     style="yellow",
                 )
             )
+
+        # Last update timestamp
+        if last_update:
+            update_str = last_update.strftime("%H:%M:%S")
+            content.append(Text(""))  # spacing
+            content.append(Text(f"Updated: {update_str}", style="dim"))
 
         return Group(*content)
 
