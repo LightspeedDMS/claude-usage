@@ -204,8 +204,24 @@ class TestConsoleAPIClientFetchUsageReport(unittest.TestCase):
 
     @patch("claude_usage.api.ConsoleAPIClient._handle_pagination")
     def test_fetch_usage_report_success(self, mock_pagination):
-        """Test that fetch_usage_report returns usage data on success"""
-        mock_pagination.return_value = ([{"messages": 100}], None)
+        """Test that fetch_usage_report returns aggregated usage data on success"""
+        # Mock pagination returns raw API response
+        raw_data = [
+            {
+                "starting_at": "2025-01-01T00:00:00Z",
+                "ending_at": "2025-01-01T23:59:59Z",
+                "results": [
+                    {
+                        "model": "claude-sonnet-4-5-20250929",
+                        "input_tokens": 100,
+                        "output_tokens": 50,
+                        "cache_creation_input_tokens": 10,
+                        "cache_read_input_tokens": 20,
+                    }
+                ],
+            }
+        ]
+        mock_pagination.return_value = (raw_data, None)
 
         admin_key = "sk-ant-admin-test-key-12345"
         client = ConsoleAPIClient(admin_key)
@@ -222,7 +238,9 @@ class TestConsoleAPIClientFetchUsageReport(unittest.TestCase):
         self.assertEqual(params["starting_at"], "2025-01-01")
         self.assertEqual(params["ending_at"], "2025-01-31")
 
-        self.assertEqual(len(result), 1)
+        # Verify result is aggregated dict, not raw list
+        self.assertIsInstance(result, dict)
+        self.assertIn("by_model", result)
         self.assertIsNone(error)
 
 
@@ -231,8 +249,16 @@ class TestConsoleAPIClientFetchCostReport(unittest.TestCase):
 
     @patch("claude_usage.api.ConsoleAPIClient._handle_pagination")
     def test_fetch_cost_report_success(self, mock_pagination):
-        """Test that fetch_cost_report returns cost data on success"""
-        mock_pagination.return_value = ([{"cost": 10.50}], None)
+        """Test that fetch_cost_report returns aggregated cost data on success"""
+        # Mock pagination returns raw API response
+        raw_data = [
+            {
+                "starting_at": "2025-01-01T00:00:00Z",
+                "ending_at": "2025-01-01T23:59:59Z",
+                "results": [{"currency": "USD", "amount": "10.50"}],
+            }
+        ]
+        mock_pagination.return_value = (raw_data, None)
 
         admin_key = "sk-ant-admin-test-key-12345"
         client = ConsoleAPIClient(admin_key)
@@ -244,7 +270,10 @@ class TestConsoleAPIClientFetchCostReport(unittest.TestCase):
         call_args = mock_pagination.call_args[0]
         self.assertIn("/v1/organizations/cost_report", call_args[0])
 
-        self.assertEqual(len(result), 1)
+        # Verify result is aggregated dict, not raw list
+        self.assertIsInstance(result, dict)
+        self.assertIn("total_cost_usd", result)
+        self.assertEqual(result["total_cost_usd"], 10.50)
         self.assertIsNone(error)
 
 
