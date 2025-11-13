@@ -99,13 +99,31 @@ Press Ctrl+C to stop
 └─────────────────────────────────────────────┘
 ```
 
-**Full Display (with Firefox session - overage & projection):**
+**Full Display with Monthly Overage Limit (Firefox session):**
 ```
 Claude Code Usage Monitor
 Press Ctrl+C to stop
 
 ✓ Firefox session key detected - overage data enabled
 
+┌ Claude Code Usage ──────────────────────────────────────┐
+│ 👤 John Doe (john@company.com)                          │
+│ 🏢 Acme Corporation ENTERPRISE                          │
+│ ⚡ Tier: default_claude_max_5x                          │
+│                                                          │
+│ 5-Hour Limit: ████████████████████ 100%                 │
+│ ⏰ Resets in: 2h 15m                                    │
+│                                                          │
+│ Overage: ████████░░░░░░░░░░ $110.26/$500.00             │
+│ 📊 Projected by reset: $125.40 (+$15.14)                │
+│ 📈 Rate: $6.73/hour                                     │
+│                                                          │
+│ Updated: 21:04:36                                       │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Full Display with Unlimited Overage (Firefox session):**
+```
 ┌ Claude Code Usage ──────────────────────────────────────┐
 │ 👤 John Doe (john@company.com)                          │
 │ 🏢 Acme Corporation ENTERPRISE                          │
@@ -121,8 +139,6 @@ Press Ctrl+C to stop
 │ Updated: 21:04:36                                       │
 └──────────────────────────────────────────────────────────┘
 ```
-
-Note: Overage display shows progress bar only if monthly credit limit is set by organization.
 
 **Progress Bar Color Coding:**
 - 🟢 **0-50%**: Green
