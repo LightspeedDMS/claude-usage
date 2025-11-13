@@ -21,34 +21,54 @@ This tool continuously monitors your Claude Code account usage through the offic
 
 - Python 3.6+
 - Claude Code CLI installed and authenticated
-- Python packages:
-  - `requests`
-  - `rich`
 
 ## Installation
 
-1. Clone this repository:
+### Option 1: Install with pipx (Recommended)
+
+Install directly from GitHub using pipx for isolated installation:
+
 ```bash
-git clone <repository-url>
-cd claude-usage-reporting
+pipx install git+https://github.com/LightspeedDMS/claude-usage.git
 ```
 
-2. Install required Python packages:
+### Option 2: Install with pip
+
+Install directly from GitHub using pip:
+
 ```bash
-pip install requests rich
+pip install git+https://github.com/LightspeedDMS/claude-usage.git
+```
+
+### Option 3: Install from Local Clone
+
+Clone the repository and install:
+
+```bash
+git clone https://github.com/LightspeedDMS/claude-usage.git
+cd claude-usage
+pip install .
+```
+
+### Option 4: Development Installation
+
+For development with editable install:
+
+```bash
+git clone https://github.com/LightspeedDMS/claude-usage.git
+cd claude-usage
+pip install -e .
 ```
 
 ## Usage
 
-Run the monitor:
+After installation, run the monitor from anywhere:
+
 ```bash
-./monitor-usage.py
+claude-usage
 ```
 
-Or with Python:
-```bash
-python3 monitor-usage.py
-```
+The command is globally accessible from any directory.
 
 Press `Ctrl+C` to stop monitoring.
 

@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claude-usage"
+version = "1.0.0"
+description = "Live-updating terminal dashboard for monitoring Claude Code account usage"
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "MIT"}
+authors = [
+    {name = "jsbattig", email = "jsbattig@users.noreply.github.com"}
+]
+keywords = ["claude", "claude-code", "usage", "monitoring", "dashboard", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Monitoring",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    "requests>=2.25.0",
+    "rich>=10.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/LightspeedDMS/claude-usage"
+Repository = "https://github.com/LightspeedDMS/claude-usage"
+Issues = "https://github.com/LightspeedDMS/claude-usage/issues"
+
+[project.scripts]
+claude-usage = "claude_usage.monitor:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["claude_usage*"]
+exclude = ["tests*", "docs*"]
