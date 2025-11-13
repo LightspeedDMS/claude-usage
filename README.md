@@ -9,9 +9,13 @@ This tool continuously monitors your Claude Code account usage through the Claud
 ## Features
 
 - **Live Updates**: Continuously polls usage data every 10 seconds
-- **In-Place Refresh**: Clean display that updates without scrolling
+- **Profile Information**: Display name, email, organization name
+- **Account Badges**: Shows Enterprise, Pro, or Max account status
+- **Rate Limit Tier**: Displays your current rate limit tier
 - **Progress Bars**: Visual representation of usage percentage
+- **Multiple Rate Limits**: Shows 5-hour and 7-day limits when active
 - **Reset Timer**: Countdown to next rate limit reset
+- **In-Place Refresh**: Clean display that updates without scrolling
 - **Auto Token Detection**: Automatically loads OAuth credentials from Claude Code
 - **Token Expiry Handling**: Detects expired tokens and prompts for refresh
 - **Narrow Console Friendly**: Compact display optimized for small terminal windows
@@ -78,22 +82,32 @@ Press `Ctrl+C` to stop monitoring.
 Claude Code Usage Monitor
 Press Ctrl+C to stop
 
-┌ Claude Code Usage ──────────────┐
-│ 5-Hour Limit: ████████████░░░ 78%│
-│ ⏰ Resets in: 2h 11m             │
-│                                  │
-│ Updated: 19:45:23                │
-└──────────────────────────────────┘
+┌ Claude Code Usage ──────────────────────────┐
+│ 👤 Seba (seba.battig@example.com)           │
+│ 🏢 Lightspeed DMS LLC ENTERPRISE            │
+│ ⚡ Tier: default_claude_max_5x              │
+│                                             │
+│ 5-Hour Limit: ████████████████░░ 96%       │
+│ ⏰ Resets in: 1h 40m                        │
+│                                             │
+│ Updated: 20:19:18                           │
+└─────────────────────────────────────────────┘
 ```
 
 ## How It Works
 
-### API Endpoint
+### API Endpoints
 
-This tool uses the Claude Code usage API endpoint:
+This tool uses the Claude Code API endpoints:
 
+**Usage Data:**
 ```
 GET https://api.anthropic.com/api/oauth/usage
+```
+
+**Profile Information:**
+```
+GET https://api.anthropic.com/api/oauth/profile
 ```
 
 ### Authentication
@@ -110,8 +124,9 @@ anthropic-beta: oauth-2025-04-20
 User-Agent: claude-code/2.0.37
 ```
 
-### API Response Format
+### API Response Formats
 
+**Usage Response:**
 ```json
 {
   "five_hour": {
@@ -121,6 +136,27 @@ User-Agent: claude-code/2.0.37
   "seven_day": null,
   "seven_day_oauth_apps": null,
   "seven_day_opus": null
+}
+```
+
+**Profile Response:**
+```json
+{
+  "account": {
+    "uuid": "...",
+    "full_name": "User Name",
+    "display_name": "User",
+    "email": "user@example.com",
+    "has_claude_max": false,
+    "has_claude_pro": false
+  },
+  "organization": {
+    "uuid": "...",
+    "name": "Company Name",
+    "organization_type": "claude_enterprise",
+    "billing_type": "stripe_subscription_contracted",
+    "rate_limit_tier": "default_claude_max_5x"
+  }
 }
 ```
 

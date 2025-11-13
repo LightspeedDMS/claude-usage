@@ -24,6 +24,7 @@ class ClaudeUsageMonitor:
 
     API_BASE = "https://api.anthropic.com"
     USAGE_ENDPOINT = "/api/oauth/usage"
+    PROFILE_ENDPOINT = "/api/oauth/profile"
     REFRESH_ENDPOINT = "/v1/oauth/token"
 
     POLL_INTERVAL = 10  # seconds
@@ -35,6 +36,7 @@ class ClaudeUsageMonitor:
         self.credentials_path = Path(credentials_path)
         self.credentials = None
         self.last_usage = None
+        self.last_profile = None
         self.last_update = None
         self.error_message = None
         self._load_credentials()
@@ -150,6 +152,30 @@ class ClaudeUsageMonitor:
             self.error_message = f"Network error: {e}"
             return False
 
+    def fetch_profile(self):
+        """Fetch profile data from Claude Code API"""
+
+        if not self.credentials:
+            return False
+
+        url = f"{self.API_BASE}{self.PROFILE_ENDPOINT}"
+        headers = self._get_auth_headers()
+
+        if not headers:
+            return False
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+
+            if response.status_code == 200:
+                self.last_profile = response.json()
+                return True
+            else:
+                return False
+
+        except requests.exceptions.RequestException:
+            return False
+
     def get_display(self):
         """Generate rich display for current usage"""
 
@@ -169,6 +195,40 @@ class ClaudeUsageMonitor:
 
         # Build display content
         content = []
+
+        # Profile information (at top)
+        if self.last_profile:
+            account = self.last_profile.get("account", {})
+            org = self.last_profile.get("organization", {})
+
+            # Account badges
+            badges = []
+            org_type = org.get("organization_type", "")
+            if org_type == "claude_enterprise":
+                badges.append("[bold blue]ENTERPRISE[/bold blue]")
+            if account.get("has_claude_pro"):
+                badges.append("[bold magenta]PRO[/bold magenta]")
+            if account.get("has_claude_max"):
+                badges.append("[bold yellow]MAX[/bold yellow]")
+
+            # User and org info
+            display_name = account.get("display_name", "")
+            email = account.get("email", "")
+            org_name = org.get("name", "")
+            rate_tier = org.get("rate_limit_tier", "")
+
+            if display_name and email:
+                content.append(Text(f"👤 {display_name} ({email})", style="bold cyan"))
+            if org_name:
+                org_text = f"🏢 {org_name}"
+                if badges:
+                    org_text += " " + " ".join(badges)
+                content.append(Text.from_markup(org_text))
+            if rate_tier:
+                content.append(Text(f"⚡ Tier: {rate_tier}", style="dim"))
+
+            if content:
+                content.append(Text(""))  # spacing
 
         # Five-hour limit
         if self.last_usage.get("five_hour"):
@@ -233,6 +293,9 @@ def main():
 
     console.print("[cyan]Claude Code Usage Monitor[/cyan]")
     console.print("[dim]Press Ctrl+C to stop[/dim]\n")
+
+    # Fetch profile once at startup
+    monitor.fetch_profile()
 
     try:
         with Live(monitor.get_display(), refresh_per_second=1, console=console) as live:
