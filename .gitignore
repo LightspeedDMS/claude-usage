@@ -42,3 +42,4 @@ Thumbs.db
 .claude/tdd-guard/data/modifications.json
 .claude/tdd-guard/data/test.json
 coverage.json
+/.analysis

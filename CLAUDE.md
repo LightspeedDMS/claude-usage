@@ -35,11 +35,13 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 ## Key Features
 
 ### Code Mode
-- **OAuth + Firefox Session**: Dual authentication for usage and overage data
-- **Monthly overage tracking**: Cumulative display, even when not actively accruing
-- **Projection system**: Spending rate from 30-minute history window
-- **Smart display**: Rate/projection only shown when utilization >= 100%
-- **Auto-refresh**: Session key refreshed every 5 minutes
+- **OAuth Authentication**: Claude Code OAuth tokens for usage/profile data
+- **5-Hour Limit Tracking**: Real-time utilization percentage and reset countdown
+- **~~Monthly Overage Tracking~~**: **DISABLED** - Cloudflare bot protection blocks access
+  - Anthropic added advanced bot detection to overage API
+  - Returns 403 Forbidden with challenge page
+  - Code kept for reference but disabled to avoid spamming failed requests
+- **7-Day Data Retention**: Smart rate calculation with progressive fallback windows
 - **Polling**: Every 30 seconds
 
 ### Console Mode

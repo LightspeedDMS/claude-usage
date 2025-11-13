@@ -34,8 +34,8 @@ class TestMainE2E(unittest.TestCase):
         # Mock everything except parse_args to test it gets called
         with patch("sys.argv", ["monitor.py", "--mode", "console"]):
             with patch.dict(os.environ, {}, clear=True):
-                with patch("claude_usage.monitor.ClaudeUsageMonitor") as MockMonitor:
-                    with patch("claude_usage.monitor.Live") as MockLive:
+                with patch("claude_usage.ClaudeUsageMonitor") as MockMonitor:
+                    with patch("claude_usage.console_mode.monitor.Live") as MockLive:
                         with patch("claude_usage.monitor.console"):
                             # Setup mocks
                             mock_monitor = MockMonitor.return_value
@@ -80,7 +80,7 @@ class TestMainE2E(unittest.TestCase):
                 {"ANTHROPIC_ADMIN_API_KEY": "sk-ant-admin-env-key"},
                 clear=True,
             ):
-                with patch("claude_usage.monitor.Live") as MockLive:
+                with patch("claude_usage.console_mode.monitor.Live") as MockLive:
                     with patch("claude_usage.monitor.console"):
                         # Make Live context manager raise KeyboardInterrupt to exit loop
                         MockLive.return_value.__enter__.return_value = MagicMock()

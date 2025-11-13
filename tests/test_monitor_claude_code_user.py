@@ -3,14 +3,14 @@
 import unittest
 from unittest.mock import patch, Mock
 from pathlib import Path
-from claude_usage.monitor import ClaudeUsageMonitor
+from claude_usage import ClaudeUsageMonitor
 
 
 class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
     """Test cases for monitor integration with per-user Claude Code tracking"""
 
-    @patch("claude_usage.auth.AdminAuthManager")
-    @patch("claude_usage.api.ConsoleAPIClient")
+    @patch("claude_usage.console_mode.auth.AdminAuthManager")
+    @patch("claude_usage.console_mode.api.ConsoleAPIClient")
     def test_fetch_console_data_includes_user_claude_code_cost(
         self, mock_console_client_class, mock_auth_manager_class
     ):
@@ -68,7 +68,7 @@ class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
                 with patch("builtins.open", create=True):
                     with patch("json.load") as mock_json_load:
                         with patch(
-                            "claude_usage.monitor.UsageStorage"
+                            "claude_usage.console_mode.storage.ConsoleStorage"
                         ) as mock_storage_class:
                             mock_storage = Mock()
                             mock_storage.store_console_snapshot = Mock()
@@ -78,8 +78,6 @@ class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
                                 "anthropicConsole": {"adminApiKey": "sk-ant-admin-test"}
                             }
                             monitor = ClaudeUsageMonitor()
-                            monitor.mode = "console"
-                            monitor._initialize_mode_components()
 
                             # Execute
                             result = monitor.fetch_console_data()
@@ -101,8 +99,8 @@ class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
                                 "user1@example.com",
                             )
 
-    @patch("claude_usage.auth.AdminAuthManager")
-    @patch("claude_usage.api.ConsoleAPIClient")
+    @patch("claude_usage.console_mode.auth.AdminAuthManager")
+    @patch("claude_usage.console_mode.api.ConsoleAPIClient")
     def test_fetch_console_data_handles_user_not_found(
         self, mock_console_client_class, mock_auth_manager_class
     ):
@@ -155,7 +153,7 @@ class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
                 with patch("builtins.open", create=True):
                     with patch("json.load") as mock_json_load:
                         with patch(
-                            "claude_usage.monitor.UsageStorage"
+                            "claude_usage.console_mode.storage.ConsoleStorage"
                         ) as mock_storage_class:
                             mock_storage = Mock()
                             mock_storage.store_console_snapshot = Mock()
@@ -165,8 +163,6 @@ class TestMonitorClaudeCodeUserTracking(unittest.TestCase):
                                 "anthropicConsole": {"adminApiKey": "sk-ant-admin-test"}
                             }
                             monitor = ClaudeUsageMonitor()
-                            monitor.mode = "console"
-                            monitor._initialize_mode_components()
 
                             # Execute
                             result = monitor.fetch_console_data()

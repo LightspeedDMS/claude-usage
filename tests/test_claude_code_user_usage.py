@@ -9,8 +9,8 @@ from claude_usage.api import ConsoleAPIClient
 class TestFetchClaudeCodeUserUsage(unittest.TestCase):
     """Test cases for fetch_claude_code_user_usage method"""
 
-    @patch("claude_usage.api.requests.get")
-    @patch("claude_usage.api.date")
+    @patch("claude_usage.console_mode.api.requests.get")
+    @patch("claude_usage.console_mode.api.date")
     def test_fetch_claude_code_user_usage_single_day(self, mock_date, mock_get):
         """Test fetching Claude Code usage for a single day"""
         # Mock date to ensure deterministic behavior
@@ -46,8 +46,8 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         self.assertEqual(result["users"][0]["email"], "user1@example.com")
         self.assertEqual(result["users"][0]["cost_usd"], 50.25)
 
-    @patch("claude_usage.api.requests.get")
-    @patch("claude_usage.api.date")
+    @patch("claude_usage.console_mode.api.requests.get")
+    @patch("claude_usage.console_mode.api.date")
     def test_fetch_claude_code_user_usage_multiple_days(self, mock_date, mock_get):
         """Test fetching Claude Code usage across multiple days"""
         # Mock date to ensure deterministic behavior
@@ -110,8 +110,8 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         self.assertEqual(result["users"][0]["email"], "user1@example.com")
         self.assertEqual(result["users"][0]["cost_usd"], 125.0)  # 50 + 75
 
-    @patch("claude_usage.api.requests.get")
-    @patch("claude_usage.api.date")
+    @patch("claude_usage.console_mode.api.requests.get")
+    @patch("claude_usage.console_mode.api.date")
     def test_fetch_claude_code_user_usage_multiple_users(self, mock_date, mock_get):
         """Test fetching Claude Code usage for multiple users"""
         # Mock date to ensure deterministic behavior
@@ -156,8 +156,8 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         self.assertEqual(users_sorted[1]["email"], "user2@example.com")
         self.assertEqual(users_sorted[1]["cost_usd"], 100.0)
 
-    @patch("claude_usage.api.requests.get")
-    @patch("claude_usage.api.date")
+    @patch("claude_usage.console_mode.api.requests.get")
+    @patch("claude_usage.console_mode.api.date")
     def test_fetch_claude_code_user_usage_handles_api_error(self, mock_date, mock_get):
         """Test error handling for API failures"""
         # Mock date to ensure deterministic behavior
@@ -179,8 +179,8 @@ class TestFetchClaudeCodeUserUsage(unittest.TestCase):
         self.assertIsNotNone(error)
         self.assertIn("Rate limit", error)
 
-    @patch("claude_usage.api.requests.get")
-    @patch("claude_usage.api.date")
+    @patch("claude_usage.console_mode.api.requests.get")
+    @patch("claude_usage.console_mode.api.date")
     def test_fetch_claude_code_user_usage_empty_results(self, mock_date, mock_get):
         """Test handling of empty results"""
         # Mock date to ensure deterministic behavior

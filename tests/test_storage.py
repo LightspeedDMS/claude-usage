@@ -112,9 +112,9 @@ class TestUsageStorage:
         assert row[0] == "null"
 
     def test_store_console_snapshot_cleans_old_data(self, storage, temp_db):
-        """Test store_console_snapshot keeps only last 24 hours of data"""
-        # Insert old snapshot (25 hours ago)
-        old_timestamp = int(datetime.now().timestamp()) - (25 * 3600)
+        """Test store_console_snapshot keeps only last 7 days of data"""
+        # Insert old snapshot (8 days ago - beyond 7-day retention)
+        old_timestamp = int(datetime.now().timestamp()) - (8 * 24 * 3600)
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
         cursor.execute(

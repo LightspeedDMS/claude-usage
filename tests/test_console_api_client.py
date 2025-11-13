@@ -45,7 +45,7 @@ class TestConsoleAPIClientHeaders(unittest.TestCase):
 class TestConsoleAPIClientDateHelpers(unittest.TestCase):
     """Test cases for date range calculation helpers"""
 
-    @patch("claude_usage.api.date")
+    @patch("claude_usage.console_mode.api.date")
     def test_calculate_mtd_range_returns_month_to_date_range(self, mock_date):
         """Test that _calculate_mtd_range returns correct month-to-date range"""
         # Mock today's date as November 12, 2025
@@ -64,7 +64,7 @@ class TestConsoleAPIClientDateHelpers(unittest.TestCase):
 class TestConsoleAPIClientFetchOrganization(unittest.TestCase):
     """Test cases for fetch_organization method"""
 
-    @patch("claude_usage.api.requests.get")
+    @patch("claude_usage.console_mode.api.requests.get")
     def test_fetch_organization_success(self, mock_get):
         """Test that fetch_organization returns org data on success"""
         # Mock successful response
@@ -98,7 +98,7 @@ class TestConsoleAPIClientFetchOrganization(unittest.TestCase):
 class TestConsoleAPIClientPagination(unittest.TestCase):
     """Test cases for pagination handling"""
 
-    @patch("claude_usage.api.requests.get")
+    @patch("claude_usage.console_mode.api.requests.get")
     def test_handle_pagination_single_page(self, mock_get):
         """Test _handle_pagination with single page response"""
         # Mock single page response
@@ -122,7 +122,7 @@ class TestConsoleAPIClientPagination(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertIsNone(error)
 
-    @patch("claude_usage.api.requests.get")
+    @patch("claude_usage.console_mode.api.requests.get")
     def test_handle_pagination_multiple_pages(self, mock_get):
         """Test _handle_pagination with multiple pages"""
         # Mock two-page response
@@ -159,7 +159,7 @@ class TestConsoleAPIClientPagination(unittest.TestCase):
 class TestConsoleAPIClientFetchWorkspaces(unittest.TestCase):
     """Test cases for fetch_workspaces method"""
 
-    @patch("claude_usage.api.ConsoleAPIClient._handle_pagination")
+    @patch("claude_usage.console_mode.api.ConsoleAPIClient._handle_pagination")
     def test_fetch_workspaces_success(self, mock_pagination):
         """Test that fetch_workspaces returns workspaces list on success"""
         mock_pagination.return_value = (
@@ -187,7 +187,7 @@ class TestConsoleAPIClientFetchWorkspaces(unittest.TestCase):
 class TestConsoleAPIClientFetchUsageReport(unittest.TestCase):
     """Test cases for fetch_usage_report method"""
 
-    @patch("claude_usage.api.ConsoleAPIClient._handle_pagination")
+    @patch("claude_usage.console_mode.api.ConsoleAPIClient._handle_pagination")
     def test_fetch_usage_report_success(self, mock_pagination):
         """Test that fetch_usage_report returns aggregated usage data on success"""
         # Mock pagination returns raw API response
@@ -232,7 +232,7 @@ class TestConsoleAPIClientFetchUsageReport(unittest.TestCase):
 class TestConsoleAPIClientFetchCostReport(unittest.TestCase):
     """Test cases for fetch_cost_report method"""
 
-    @patch("claude_usage.api.ConsoleAPIClient._handle_pagination")
+    @patch("claude_usage.console_mode.api.ConsoleAPIClient._handle_pagination")
     def test_fetch_cost_report_success(self, mock_pagination):
         """Test that fetch_cost_report returns aggregated cost data on success"""
         # Mock pagination returns raw API response
@@ -265,7 +265,7 @@ class TestConsoleAPIClientFetchCostReport(unittest.TestCase):
 class TestConsoleAPIClientFetchClaudeCodeAnalytics(unittest.TestCase):
     """Test cases for fetch_claude_code_analytics method"""
 
-    @patch("claude_usage.api.requests.get")
+    @patch("claude_usage.console_mode.api.requests.get")
     def test_fetch_claude_code_analytics_returns_none_on_404(self, mock_get):
         """Test that fetch_claude_code_analytics returns None with error on 404"""
         mock_response = Mock()

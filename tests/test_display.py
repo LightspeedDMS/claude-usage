@@ -26,7 +26,7 @@ class TestUsageRenderer(unittest.TestCase):
         - 100% utilization shows full colored bar
         """
         # Mock the Progress class to capture BarColumn initialization
-        with patch("claude_usage.display.Progress") as mock_progress_class:
+        with patch("claude_usage.code_mode.display.Progress") as mock_progress_class:
             # Create a mock Progress instance
             mock_progress = MagicMock()
             mock_progress_class.return_value = mock_progress
@@ -114,7 +114,7 @@ class TestUsageRenderer(unittest.TestCase):
 
         for utilization, expected_style in test_cases:
             with self.subTest(utilization=utilization):
-                with patch("claude_usage.display.Progress") as mock_progress_class:
+                with patch("claude_usage.code_mode.display.Progress") as mock_progress_class:
                     mock_progress = MagicMock()
                     mock_progress_class.return_value = mock_progress
                     mock_progress.add_task.return_value = 1

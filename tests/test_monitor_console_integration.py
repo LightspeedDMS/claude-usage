@@ -48,4 +48,4 @@ class TestConsoleMonitorIntegration:
                 monitor, "admin_auth_manager"
             ), "Should have admin_auth_manager"
             assert hasattr(monitor, "console_client"), "Should have console_client"
-            assert hasattr(monitor, "console_renderer"), "Should have console_renderer"
+            assert hasattr(monitor, "renderer"), "Should have renderer"
