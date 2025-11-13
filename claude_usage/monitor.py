@@ -95,9 +95,11 @@ class ClaudeUsageMonitor:
         1. Explicit mode field in credentials file (user override)
         2. Claude Code OAuth credentials (subscription/code mode)
         3. Anthropic Console Admin API key (console mode)
+        4. macOS Keychain (if on macOS and file doesn't exist)
         """
         import os
         import json
+        import platform
 
         # Check credentials file
         try:
@@ -115,6 +117,15 @@ class ClaudeUsageMonitor:
             # Check for Anthropic Console Admin API key in file (third priority)
             if "anthropicConsole" in data and "adminApiKey" in data["anthropicConsole"]:
                 return "console"
+        except FileNotFoundError:
+            # File doesn't exist - check macOS Keychain
+            if platform.system() == "Darwin":
+                # Try to detect credentials in Keychain
+                from .auth import OAuthManager
+                temp_oauth = OAuthManager(self.credentials_path)
+                data, error = temp_oauth.extract_from_macos_keychain()
+                if data and not error:
+                    return "code"
         except Exception:
             pass
 

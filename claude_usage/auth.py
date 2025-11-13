@@ -5,6 +5,8 @@ import logging
 import sqlite3
 import shutil
 import tempfile
+import platform
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -15,9 +17,60 @@ class OAuthManager:
     def __init__(self, credentials_path):
         self.credentials_path = Path(credentials_path)
 
-    def load_credentials(self):
-        """Load OAuth credentials from Claude Code config"""
+    def extract_from_macos_keychain(self):
+        """Extract OAuth credentials from macOS Keychain
+
+        Returns:
+            tuple: (credentials_dict, error_message)
+        """
         try:
+            result = subprocess.run(
+                ["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            credentials_json = result.stdout.strip()
+            data = json.loads(credentials_json)
+
+            if "claudeAiOauth" not in data:
+                return None, "No OAuth credentials found in Keychain"
+
+            return data, None
+
+        except subprocess.CalledProcessError as e:
+            return None, f"Failed to extract from Keychain: {e.stderr}"
+        except json.JSONDecodeError as e:
+            return None, f"Invalid JSON from Keychain: {e}"
+        except Exception as e:
+            return None, f"Keychain extraction error: {e}"
+
+    def save_credentials_file(self, data):
+        """Save credentials data to file
+
+        Args:
+            data: Full credentials dictionary to save
+        """
+        try:
+            # Ensure directory exists
+            self.credentials_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(self.credentials_path, "w") as f:
+                json.dump(data, f, indent=2)
+
+            return True, None
+
+        except Exception as e:
+            return False, f"Failed to save credentials: {e}"
+
+    def load_credentials(self):
+        """Load OAuth credentials from Claude Code config
+
+        Automatically extracts from macOS Keychain if file doesn't exist on macOS.
+        """
+        try:
+            # Try reading from file first (works on Linux and macOS if file exists)
             with open(self.credentials_path) as f:
                 data = json.load(f)
 
@@ -25,6 +78,25 @@ class OAuthManager:
                 raise ValueError("No OAuth credentials found")
 
             return data["claudeAiOauth"], None
+
+        except FileNotFoundError:
+            # File doesn't exist - try macOS Keychain extraction
+            if platform.system() == "Darwin":
+                data, error = self.extract_from_macos_keychain()
+
+                if error:
+                    return None, f"Failed to load credentials: {error}"
+
+                # Save to file for future use
+                save_success, save_error = self.save_credentials_file(data)
+                if not save_success:
+                    logging.getLogger(__name__).warning(
+                        f"Extracted from Keychain but couldn't save to file: {save_error}"
+                    )
+
+                return data["claudeAiOauth"], None
+            else:
+                return None, "Credentials file not found. Please run 'claude' to authenticate."
 
         except Exception as e:
             return None, f"Failed to load credentials: {e}"
