@@ -17,6 +17,8 @@ This tool continuously monitors your Claude Code account usage through the Claud
 - **Reset Timer**: Countdown to next rate limit reset
 - **Overage Tracking**: Displays overage spending in dollars (requires Firefox session)
 - **Usage Projection**: Projects overage costs to next reset with rate calculation
+- **Pace-Maker Integration**: Displays throttling status when Claude Pace Maker installed
+- **7-Day Data Retention**: Smart retention with progressive fallback for rate calculations
 - **Historical Tracking**: Stores usage snapshots locally for trend analysis
 - **In-Place Refresh**: Clean display that updates without scrolling
 - **Auto Token Detection**: Automatically loads OAuth credentials from Claude Code
@@ -135,6 +137,26 @@ Press Ctrl+C to stop
 │ 💳 Overage: $110.26                                     │
 │ 📊 Projected by reset: $125.40 (+$15.14)                │
 │ 📈 Rate: $6.73/hour                                     │
+│                                                          │
+│ Updated: 21:04:36                                       │
+└──────────────────────────────────────────────────────────┘
+```
+
+**With Pace-Maker Integration (when installed):**
+```
+┌ Claude Code Usage ──────────────────────────────────────┐
+│ 👤 John Doe (john@company.com)                          │
+│ 🏢 Acme Corporation ENTERPRISE                          │
+│ ⚡ Tier: default_claude_max_5x                          │
+│                                                          │
+│ 5-Hour Limit: ████████████████░░░░ 78%                  │
+│ ⏰ Resets in: 3h 45m                                    │
+│                                                          │
+│ 🎯 Pace Maker: ACTIVE (adaptive)                        │
+│    Status: THROTTLING (ahead of pace)                   │
+│    Constrained window: 5-hour                           │
+│    Deviation: +15.2% (78.0% vs target 62.8%)            │
+│    Delay: 45s per request                               │
 │                                                          │
 │ Updated: 21:04:36                                       │
 └──────────────────────────────────────────────────────────┘
@@ -261,7 +283,7 @@ The monitor includes a sophisticated projection system that predicts overage cos
 
 **How It Works:**
 1. **Data Collection**: Stores usage snapshots every 30 seconds to `~/.claude-usage/usage_history.db`
-2. **Rate Calculation**: Calculates spending rate from 30-minute historical window
+2. **Rate Calculation**: Calculates spending rate using progressive fallback windows (30m → 1h → 2h → 4h → 7d)
 3. **Projection**: Projects total overage by reset time using formula: `current + (rate × hours_until_reset)`
 4. **Display**: Shows current overage, projected total, and hourly rate
 
@@ -277,7 +299,8 @@ CREATE TABLE usage_snapshots (
 
 **Requirements:**
 - Projection appears after ~30 minutes of data collection
-- Automatic cleanup of data older than 24 hours
+- 7-day data retention with automatic cleanup
+- Smart rate calculation with progressive fallback for accuracy
 - Non-blocking storage (failures don't affect monitoring)
 
 ### Token Management
@@ -295,6 +318,16 @@ Session key extraction from Firefox:
 - Queries `moz_cookies` table for `sessionKey` cookie
 - Refreshes every 5 minutes automatically
 - Fallback to OAuth-only mode if Firefox not available
+
+### Pace-Maker Integration
+
+Optional integration with [Claude Pace Maker](https://github.com/LightspeedDMS/claude-pace-maker):
+- Automatically detects Pace-Maker installation in `~/.claude-pace-maker`
+- Reads throttling status from Pace-Maker database and config
+- Displays real-time throttling decisions and delay timings
+- Shows deviation from target pace and constrained window
+- No installation required - read-only integration
+- Supports both adaptive and legacy pacing algorithms
 
 ## Troubleshooting
 
@@ -330,6 +363,7 @@ curl -I https://api.anthropic.com
 - Overage tracking requires Firefox with active claude.ai session
 - Projection requires 30 minutes of historical data
 - Only monitors 5-hour rate limit window (primary limit)
+- Pace-Maker integration requires separate installation of Claude Pace Maker
 
 ## Contributing
 

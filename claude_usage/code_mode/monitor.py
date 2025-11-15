@@ -12,6 +12,7 @@ from ..shared.auth import FirefoxSessionManager
 from .api import ClaudeAPIClient
 from .storage import CodeStorage, CodeAnalytics
 from .display import UsageRenderer
+from .pacemaker_integration import PaceMakerReader
 
 console = Console()
 
@@ -36,6 +37,7 @@ class CodeMonitor:
         self.storage = CodeStorage(db_path)
         self.analytics = CodeAnalytics(self.storage)
         self.renderer = UsageRenderer()
+        self.pacemaker_reader = PaceMakerReader()
 
         # State
         self.credentials = None
@@ -152,6 +154,11 @@ class CodeMonitor:
                 self.last_overage, self.last_usage
             )
 
+        # Get pace-maker status if installed
+        pacemaker_status = None
+        if self.pacemaker_reader.is_installed():
+            pacemaker_status = self.pacemaker_reader.get_status()
+
         return self.renderer.render(
             self.error_message,
             self.last_usage,
@@ -159,6 +166,7 @@ class CodeMonitor:
             self.last_overage,
             self.last_update,
             projection,
+            pacemaker_status,
         )
 
     def run(self):

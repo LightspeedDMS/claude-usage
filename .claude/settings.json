@@ -16,6 +16,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "~/.claude/hooks/user-prompt-submit.sh"
+          },
+          {
+            "type": "command",
             "command": "tdd-guard"
           }
         ]
@@ -28,6 +32,17 @@
           {
             "type": "command",
             "command": "tdd-guard"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/post-tool-use.sh",
+            "timeout": 360
           }
         ]
       }

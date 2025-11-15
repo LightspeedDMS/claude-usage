@@ -18,6 +18,7 @@ class UsageRenderer:
         last_overage,
         last_update,
         projection,
+        pacemaker_status=None,
     ):
         """Generate rich display for current usage"""
 
@@ -58,6 +59,10 @@ class UsageRenderer:
                 utilization = last_usage["five_hour"].get("utilization", 0)
 
             self._render_overage(content, last_overage, projection, utilization)
+
+        # Pace-maker status (if available)
+        if pacemaker_status:
+            self._render_pacemaker(content, pacemaker_status)
 
         # Last update time
         if last_update:
@@ -105,7 +110,7 @@ class UsageRenderer:
             content.append(Text(""))  # spacing
 
     def _render_five_hour_limit(self, content, five_hour):
-        """Render five-hour limit display"""
+        """Render five-hour usage display"""
         utilization = five_hour.get("utilization", 0)
         resets_at = five_hour.get("resets_at", "")
 
@@ -121,7 +126,7 @@ class UsageRenderer:
 
         # Progress bar
         progress = Progress(
-            TextColumn("[bold]5-Hour Limit:[/bold]"),
+            TextColumn("[bold]5-Hour Usage:[/bold]"),
             BarColumn(
                 bar_width=20,
                 complete_style=bar_style,
@@ -144,17 +149,50 @@ class UsageRenderer:
             content.append(Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan"))
 
     def _render_seven_day_limit(self, content, seven_day):
-        """Render seven-day limit display"""
+        """Render seven-day usage display"""
         utilization = seven_day.get("utilization", 0)
+        resets_at = seven_day.get("resets_at", "")
+
+        # Determine color based on utilization (same logic as 5-hour)
+        if utilization >= 100:
+            bar_style = "bold red"
+        elif utilization >= 81:
+            bar_style = "bold bright_yellow"  # Orange-ish
+        elif utilization >= 51:
+            bar_style = "bold yellow"
+        else:
+            bar_style = "bold green"
 
         progress = Progress(
-            TextColumn("[bold]7-Day Limit:[/bold]"),
-            BarColumn(bar_width=20),
+            TextColumn("[bold]7-Day Usage:[/bold]"),
+            BarColumn(
+                bar_width=20,
+                complete_style=bar_style,
+                finished_style=bar_style,
+            ),
             TextColumn("[bold]{task.percentage:>3.0f}%[/bold]"),
         )
         _ = progress.add_task("usage", total=100, completed=utilization)
         content.append(Text(""))  # spacing
         content.append(progress)
+
+        if resets_at:
+            reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
+            now = datetime.utcnow()
+            time_until = reset_time - now
+
+            # Calculate days, hours, and minutes
+            days = time_until.days
+            hours = time_until.seconds // 3600
+            minutes = (time_until.seconds % 3600) // 60
+
+            # Format the countdown message
+            if days > 0:
+                content.append(
+                    Text(f"⏰ Resets in: {days}d {hours}h {minutes}m", style="cyan")
+                )
+            else:
+                content.append(Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan"))
 
     def _render_overage(self, content, overage, projection, utilization):
         """Render overage and projection display"""
@@ -199,3 +237,108 @@ class UsageRenderer:
                     )
                 )
                 content.append(Text(f"📈 Rate: ${rate_dollars:.2f}/hour", style="dim"))
+
+    def _render_pacemaker(self, content, pm_status):
+        """Render pace-maker status and throttling information"""
+        content.append(Text(""))  # spacing
+
+        # Status header
+        enabled = pm_status.get("enabled", False)
+        has_data = pm_status.get("has_data", False)
+
+        if not has_data:
+            # Pace-maker installed but no data yet
+            status_line = "🎯 Pace Maker: " + (
+                "[bold green]ACTIVE[/bold green]" if enabled else "[dim]INACTIVE[/dim]"
+            )
+            content.append(Text.from_markup(status_line))
+            content.append(Text("   No usage data yet", style="dim"))
+            return
+
+        # Check for errors
+        if "error" in pm_status:
+            content.append(Text("🎯 Pace Maker: [yellow]ERROR[/yellow]", style="bold"))
+            content.append(Text(f"   {pm_status['error']}", style="dim"))
+            return
+
+        # Full status display
+        should_throttle = pm_status.get("should_throttle", False)
+        delay_seconds = pm_status.get("delay_seconds", 0)
+
+        # Status line with badge
+        if not enabled:
+            status_badge = "[dim]INACTIVE[/dim]"
+        elif should_throttle:
+            status_badge = "[bold yellow]⚠️ THROTTLING[/bold yellow]"
+        else:
+            status_badge = "[bold green]✓ ON PACE[/bold green]"
+
+        content.append(Text.from_markup(f"🎯 Pace Maker: {status_badge}"))
+
+        # Get window data
+        constrained = pm_status.get("constrained_window")
+        if not constrained:
+            content.append(Text("   No active windows", style="dim"))
+            return
+
+        # Select which window to display (the constrained one)
+        if constrained == "5-hour":
+            window_data = pm_status.get("five_hour", {})
+            window_label = "5-Hour"
+        else:
+            window_data = pm_status.get("seven_day", {})
+            window_label = "7-Day"
+
+        target = window_data.get("target", 0)
+        deviation = pm_status.get("deviation_percent", 0)
+
+        # Target pace progress bar
+        target_progress = Progress(
+            TextColumn(f"   [bold]{window_label} Target:[/bold]"),
+            BarColumn(
+                bar_width=20,
+                complete_style="cyan",
+                finished_style="cyan",
+            ),
+            TextColumn("[bold]{task.percentage:>3.0f}%[/bold]"),
+        )
+        _ = target_progress.add_task("target", total=100, completed=target)
+        content.append(target_progress)
+
+        # Deviation display
+        if deviation < 0:
+            # Under budget (good - using less than target)
+            dev_style = "green"
+            dev_text = "under budget"
+        elif deviation <= 5:
+            # Slightly over budget
+            dev_style = "bright_yellow"
+            dev_text = "over budget"
+        else:
+            # Significantly over budget
+            dev_style = "red"
+            dev_text = "over budget"
+
+        content.append(
+            Text.from_markup(
+                f"   Deviation: [{dev_style}]{deviation:+.1f}% ({dev_text})[/{dev_style}]"
+            )
+        )
+
+        # Throttling info
+        if should_throttle and delay_seconds > 0:
+            content.append(
+                Text(
+                    f"   ⏱️  Next delay: {delay_seconds}s per tool use",
+                    style="yellow",
+                )
+            )
+
+        # Algorithm info (compact)
+        algorithm = pm_status.get("algorithm", "legacy")
+        strategy = pm_status.get("strategy", "")
+        if algorithm == "adaptive" and strategy:
+            algo_text = f"adaptive/{strategy}"
+        else:
+            algo_text = algorithm
+        content.append(Text(f"   Algorithm: {algo_text}", style="dim"))
