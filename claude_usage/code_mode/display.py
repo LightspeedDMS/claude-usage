@@ -19,6 +19,7 @@ class UsageRenderer:
         last_update,
         projection,
         pacemaker_status=None,
+        weekly_limit_enabled=True,
     ):
         """Generate rich display for current usage"""
 
@@ -47,9 +48,11 @@ class UsageRenderer:
         if last_usage.get("five_hour"):
             self._render_five_hour_limit(content, last_usage["five_hour"])
 
-        # Seven-day limit
+        # Seven-day limit (always show if data available)
         if last_usage.get("seven_day"):
-            self._render_seven_day_limit(content, last_usage["seven_day"])
+            self._render_seven_day_limit(
+                content, last_usage["seven_day"], weekly_limit_enabled
+            )
 
         # Overage credits
         if last_overage:
@@ -62,7 +65,9 @@ class UsageRenderer:
 
         # Pace-maker status (if available)
         if pacemaker_status:
-            self._render_pacemaker(content, pacemaker_status)
+            self._render_pacemaker(
+                content, pacemaker_status, last_usage, weekly_limit_enabled
+            )
 
         # Last update time
         if last_update:
@@ -96,13 +101,24 @@ class UsageRenderer:
         org_name = org.get("name", "")
         rate_tier = org.get("rate_limit_tier", "")
 
+        # Strip "Organization" word entirely if present (Claude API sometimes includes it)
+        if display_name:
+            display_name = display_name.replace("Organization", "").strip()
+        if org_name:
+            # Remove "Organization" from anywhere in the string
+            org_name = org_name.replace("Organization", "").strip()
+            # If empty after removal, don't display
+            if not org_name:
+                org_name = ""
+
         if display_name and email:
             content.append(Text(f"👤 {display_name} ({email})", style="bold cyan"))
         if org_name:
-            org_text = f"🏢 {org_name}"
+            # Show org name on one line (no "Org:" label, just icon and name)
+            content.append(Text(f"🏢 {org_name}", style="bold"))
+            # Show plan badges on separate line if present
             if badges:
-                org_text += " " + " ".join(badges)
-            content.append(Text.from_markup(org_text))
+                content.append(Text.from_markup("   Plan: " + " ".join(badges)))
         if rate_tier:
             content.append(Text(f"⚡ Tier: {rate_tier}", style="dim"))
 
@@ -126,9 +142,9 @@ class UsageRenderer:
 
         # Progress bar
         progress = Progress(
-            TextColumn("[bold]5-Hour Usage:[/bold]"),
+            TextColumn("[bold]5-Hour Usage:  [/bold]"),
             BarColumn(
-                bar_width=20,
+                bar_width=14,
                 complete_style=bar_style,
                 finished_style=bar_style,
             ),
@@ -148,8 +164,14 @@ class UsageRenderer:
 
             content.append(Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan"))
 
-    def _render_seven_day_limit(self, content, seven_day):
-        """Render seven-day usage display"""
+    def _render_seven_day_limit(self, content, seven_day, weekly_limit_enabled=True):
+        """Render seven-day usage display
+
+        Args:
+            content: List to append rendered content to
+            seven_day: Seven-day usage data
+            weekly_limit_enabled: Whether weekly throttling is enabled (affects display note only)
+        """
         utilization = seven_day.get("utilization", 0)
         resets_at = seven_day.get("resets_at", "")
 
@@ -163,10 +185,11 @@ class UsageRenderer:
         else:
             bar_style = "bold green"
 
+        # Progress bar (without throttling note in label)
         progress = Progress(
-            TextColumn("[bold]7-Day Usage:[/bold]"),
+            TextColumn("[bold]7-Day Usage:   [/bold]"),
             BarColumn(
-                bar_width=20,
+                bar_width=14,
                 complete_style=bar_style,
                 finished_style=bar_style,
             ),
@@ -175,6 +198,10 @@ class UsageRenderer:
         _ = progress.add_task("usage", total=100, completed=utilization)
         content.append(Text(""))  # spacing
         content.append(progress)
+
+        # Throttling disabled note below progress bar
+        if not weekly_limit_enabled:
+            content.append(Text("(throttling disabled)", style="dim"))
 
         if resets_at:
             reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
@@ -209,8 +236,8 @@ class UsageRenderer:
                 # Show progress bar if there's a limit
                 limit_dollars = monthly_limit / 100
                 progress = Progress(
-                    TextColumn("[bold]Overage:[/bold]"),
-                    BarColumn(bar_width=20),
+                    TextColumn("[bold]Overage:       [/bold]"),
+                    BarColumn(bar_width=14),
                     TextColumn("[bold]${task.completed:.2f}/${task.total:.2f}[/bold]"),
                 )
                 _ = progress.add_task(
@@ -238,8 +265,17 @@ class UsageRenderer:
                 )
                 content.append(Text(f"📈 Rate: ${rate_dollars:.2f}/hour", style="dim"))
 
-    def _render_pacemaker(self, content, pm_status):
-        """Render pace-maker status and throttling information"""
+    def _render_pacemaker(
+        self, content, pm_status, last_usage, weekly_limit_enabled=True
+    ):
+        """Render pace-maker status and throttling information
+
+        Args:
+            content: List to append rendered content to
+            pm_status: Pace-maker status from integration module
+            last_usage: Fresh usage data from API (for fresh utilization)
+            weekly_limit_enabled: Whether weekly limit is enabled
+        """
         content.append(Text(""))  # spacing
 
         # Status header
@@ -252,13 +288,13 @@ class UsageRenderer:
                 "[bold green]ACTIVE[/bold green]" if enabled else "[dim]INACTIVE[/dim]"
             )
             content.append(Text.from_markup(status_line))
-            content.append(Text("   No usage data yet", style="dim"))
+            content.append(Text("No usage data yet", style="dim"))
             return
 
         # Check for errors
         if "error" in pm_status:
             content.append(Text("🎯 Pace Maker: [yellow]ERROR[/yellow]", style="bold"))
-            content.append(Text(f"   {pm_status['error']}", style="dim"))
+            content.append(Text(f"{pm_status['error']}", style="dim"))
             return
 
         # Full status display
@@ -278,7 +314,7 @@ class UsageRenderer:
         # Get window data
         constrained = pm_status.get("constrained_window")
         if not constrained:
-            content.append(Text("   No active windows", style="dim"))
+            content.append(Text("No active windows", style="dim"))
             return
 
         # Select which window to display (the constrained one)
@@ -290,13 +326,33 @@ class UsageRenderer:
             window_label = "7-Day"
 
         target = window_data.get("target", 0)
-        deviation = pm_status.get("deviation_percent", 0)
 
-        # Target pace progress bar
+        # FIX 1: Calculate deviation from safe_allowance, not target
+        # Use fresh utilization from last_usage, not stale pm_status
+        actual_util = 0.0
+        if last_usage:
+            if constrained == "5-hour" and last_usage.get("five_hour"):
+                actual_util = last_usage["five_hour"].get("utilization", 0)
+            elif constrained == "7-day" and last_usage.get("seven_day"):
+                actual_util = last_usage["seven_day"].get("utilization", 0)
+
+        # Calculate safe_allowance = target × safety_buffer_pct
+        # Default safety buffer is 95% (5% margin)
+        safety_buffer_pct = 95.0  # TODO: Get from config if available
+        safe_allowance = target * (safety_buffer_pct / 100.0)
+
+        # Deviation = actual_util - safe_allowance (NOT target!)
+        deviation = actual_util - safe_allowance
+
+        # Target pace progress bar (pad label to align with other progress bars)
+        # "5-Hour Target:" = 14 chars, "7-Day Target:" = 13 chars
+        # Pad to 15 chars total to match other progress bars
+        target_label = f"{window_label} Target:"
+        padding = " " * (15 - len(target_label))
         target_progress = Progress(
-            TextColumn(f"   [bold]{window_label} Target:[/bold]"),
+            TextColumn(f"[bold]{target_label}{padding}[/bold]"),
             BarColumn(
-                bar_width=20,
+                bar_width=14,
                 complete_style="cyan",
                 finished_style="cyan",
             ),
@@ -321,7 +377,7 @@ class UsageRenderer:
 
         content.append(
             Text.from_markup(
-                f"   Deviation: [{dev_style}]{deviation:+.1f}% ({dev_text})[/{dev_style}]"
+                f"Deviation: [{dev_style}]{deviation:+.1f}% ({dev_text})[/{dev_style}]"
             )
         )
 
@@ -329,7 +385,7 @@ class UsageRenderer:
         if should_throttle and delay_seconds > 0:
             content.append(
                 Text(
-                    f"   ⏱️  Next delay: {delay_seconds}s per tool use",
+                    f"⏱️  Next delay: {delay_seconds}s per tool use",
                     style="yellow",
                 )
             )
@@ -341,4 +397,4 @@ class UsageRenderer:
             algo_text = f"adaptive/{strategy}"
         else:
             algo_text = algorithm
-        content.append(Text(f"   Algorithm: {algo_text}", style="dim"))
+        content.append(Text(f"Algorithm: {algo_text}", style="dim"))

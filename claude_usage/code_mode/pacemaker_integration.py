@@ -114,6 +114,7 @@ class PaceMakerReader:
                 use_adaptive=True,
                 safety_buffer_pct=config.get("safety_buffer_pct", 95.0),
                 preload_hours=config.get("preload_hours", 12.0),
+                weekly_limit_enabled=config.get("weekly_limit_enabled", True),
             )
 
             return {
@@ -127,6 +128,7 @@ class PaceMakerReader:
                 "delay_seconds": decision["delay_seconds"],
                 "algorithm": decision.get("algorithm", "legacy"),
                 "strategy": decision.get("strategy", "unknown"),
+                "weekly_limit_enabled": config.get("weekly_limit_enabled", True),
                 "last_update": usage_data["timestamp"],
             }
 

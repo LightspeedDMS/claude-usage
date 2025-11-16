@@ -156,8 +156,13 @@ class CodeMonitor:
 
         # Get pace-maker status if installed
         pacemaker_status = None
+        weekly_limit_enabled = True  # Default
         if self.pacemaker_reader.is_installed():
             pacemaker_status = self.pacemaker_reader.get_status()
+            if pacemaker_status:
+                weekly_limit_enabled = pacemaker_status.get(
+                    "weekly_limit_enabled", True
+                )
 
         return self.renderer.render(
             self.error_message,
@@ -167,6 +172,7 @@ class CodeMonitor:
             self.last_update,
             projection,
             pacemaker_status,
+            weekly_limit_enabled=weekly_limit_enabled,
         )
 
     def run(self):
