@@ -129,6 +129,7 @@ class PaceMakerReader:
                 "algorithm": decision.get("algorithm", "legacy"),
                 "strategy": decision.get("strategy", "unknown"),
                 "weekly_limit_enabled": config.get("weekly_limit_enabled", True),
+                "tempo_enabled": config.get("tempo_enabled", True),
                 "last_update": usage_data["timestamp"],
             }
 

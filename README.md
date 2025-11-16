@@ -17,7 +17,7 @@ This tool continuously monitors your Claude Code account usage through the Claud
 - **Reset Timer**: Countdown to next rate limit reset
 - **Overage Tracking**: Displays overage spending in dollars (requires Firefox session)
 - **Usage Projection**: Projects overage costs to next reset with rate calculation
-- **Pace-Maker Integration**: Displays throttling status when Claude Pace Maker installed
+- **Pace-Maker Integration**: Displays throttling status and tempo tracking when Claude Pace Maker installed
 - **7-Day Data Retention**: Smart retention with progressive fallback for rate calculations
 - **Historical Tracking**: Stores usage snapshots locally for trend analysis
 - **In-Place Refresh**: Clean display that updates without scrolling
@@ -326,6 +326,7 @@ Optional integration with [Claude Pace Maker](https://github.com/LightspeedDMS/c
 - Reads throttling status from Pace-Maker database and config
 - Displays real-time throttling decisions and delay timings
 - Shows deviation from target pace and constrained window
+- Shows tempo tracking status (enabled/disabled) with color coding
 - No installation required - read-only integration
 - Supports both adaptive and legacy pacing algorithms
 

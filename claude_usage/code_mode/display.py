@@ -398,3 +398,9 @@ class UsageRenderer:
         else:
             algo_text = algorithm
         content.append(Text(f"Algorithm: {algo_text}", style="dim"))
+
+        # Tempo tracking status
+        tempo_enabled = pm_status.get("tempo_enabled", True)
+        tempo_text = "enabled" if tempo_enabled else "disabled"
+        tempo_style = "dim" if tempo_enabled else "yellow"
+        content.append(Text(f"Tempo: {tempo_text}", style=tempo_style))
