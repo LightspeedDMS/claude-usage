@@ -43,3 +43,6 @@ Thumbs.db
 .claude/tdd-guard/data/test.json
 coverage.json
 /.analysis
+
+# MCP Server
+.ssh-mcp-server.port
