@@ -70,7 +70,9 @@ class OAuthManager:
     def load_credentials(self):
         """Load OAuth credentials from Claude Code config
 
-        Automatically extracts from macOS Keychain if file doesn't exist on macOS.
+        Automatically extracts from macOS Keychain if:
+        - File doesn't exist on macOS, OR
+        - File exists but token is expired and we're on macOS
         """
         try:
             # Try reading from file first (works on Linux and macOS if file exists)
@@ -80,7 +82,33 @@ class OAuthManager:
             if "claudeAiOauth" not in data:
                 raise ValueError("No OAuth credentials found")
 
-            return data["claudeAiOauth"], None
+            credentials = data["claudeAiOauth"]
+
+            # Check if token is expired
+            if self.is_token_expired(credentials):
+                # Token is expired - try to refresh from Keychain on macOS
+                if platform.system() == "Darwin":
+                    keychain_data, error = self.extract_from_macos_keychain()
+
+                    if error:
+                        # Keychain extraction failed, return expired token with error
+                        return credentials, "Token expired. Please run 'claude' to refresh."
+
+                    # Successfully extracted fresh token from Keychain
+                    # Save to file for future use
+                    save_success, save_error = self.save_credentials_file(keychain_data)
+                    if not save_success:
+                        logging.getLogger(__name__).warning(
+                            f"Extracted from Keychain but couldn't save to file: {save_error}"
+                        )
+
+                    return keychain_data["claudeAiOauth"], None
+                else:
+                    # Linux - no Keychain available, return expired token with error
+                    return credentials, "Token expired. Please run 'claude' to refresh."
+
+            # Token is still valid
+            return credentials, None
 
         except FileNotFoundError:
             # File doesn't exist - try macOS Keychain extraction
