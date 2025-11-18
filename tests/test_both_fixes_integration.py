@@ -68,9 +68,7 @@ class TestBothFixesIntegration(unittest.TestCase):
             error_message=None,
             last_usage=last_usage,
             last_profile=None,
-            last_overage=None,
             last_update=now,
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=True,
         )
@@ -133,9 +131,7 @@ class TestBothFixesIntegration(unittest.TestCase):
             error_message=None,
             last_usage=last_usage,
             last_profile=None,
-            last_overage=None,
             last_update=now,
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=True,
         )
@@ -199,9 +195,7 @@ class TestBothFixesIntegration(unittest.TestCase):
             error_message=None,
             last_usage=last_usage,
             last_profile=None,
-            last_overage=None,
             last_update=now,
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=True,
         )

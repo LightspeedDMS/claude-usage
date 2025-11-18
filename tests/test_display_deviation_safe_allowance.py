@@ -71,9 +71,7 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
             error_message=None,
             last_usage=last_usage,
             last_profile=None,
-            last_overage=None,
             last_update=datetime.utcnow(),
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=True,
         )
@@ -138,9 +136,7 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
             error_message=None,
             last_usage=last_usage,
             last_profile=None,
-            last_overage=None,
             last_update=datetime.utcnow(),
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=True,
         )
@@ -201,9 +197,7 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
             error_message=None,
             last_usage=last_usage,
             last_profile=None,
-            last_overage=None,
             last_update=datetime.utcnow(),
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=True,
         )
@@ -256,9 +250,7 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
             error_message=None,
             last_usage=last_usage_throttling,
             last_profile=None,
-            last_overage=None,
             last_update=datetime.utcnow(),
-            projection=None,
             pacemaker_status=pacemaker_status_throttling,
             weekly_limit_enabled=True,
         )

@@ -15,14 +15,9 @@ This tool continuously monitors your Claude Code account usage through the Claud
 - **Progress Bars**: Visual representation of usage percentage with color coding
 - **Multiple Rate Limits**: Shows 5-hour and 7-day limits when active
 - **Reset Timer**: Countdown to next rate limit reset
-- **Overage Tracking**: Displays overage spending in dollars (requires Firefox session)
-- **Usage Projection**: Projects overage costs to next reset with rate calculation
 - **Pace-Maker Integration**: Displays throttling status and tempo tracking when Claude Pace Maker installed
-- **7-Day Data Retention**: Smart retention with progressive fallback for rate calculations
-- **Historical Tracking**: Stores usage snapshots locally for trend analysis
 - **In-Place Refresh**: Clean display that updates without scrolling
 - **Auto Token Detection**: Automatically loads OAuth credentials from Claude Code
-- **Firefox Session Integration**: Automatically extracts session key for overage data
 - **Token Expiry Handling**: Detects expired tokens and prompts for refresh
 - **Narrow Console Friendly**: Compact display optimized for small terminal windows
 - **Ctrl+C Handling**: Clean exit on interrupt
@@ -101,47 +96,6 @@ Press Ctrl+C to stop
 └─────────────────────────────────────────────┘
 ```
 
-**Full Display with Monthly Overage Limit (Firefox session):**
-```
-Claude Code Usage Monitor
-Press Ctrl+C to stop
-
-✓ Firefox session key detected - overage data enabled
-
-┌ Claude Code Usage ──────────────────────────────────────┐
-│ 👤 John Doe (john@company.com)                          │
-│ 🏢 Acme Corporation ENTERPRISE                          │
-│ ⚡ Tier: default_claude_max_5x                          │
-│                                                          │
-│ 5-Hour Limit: ████████████████████ 100%                 │
-│ ⏰ Resets in: 2h 15m                                    │
-│                                                          │
-│ Overage: ████████░░░░░░░░░░ $110.26/$500.00             │
-│ 📊 Projected by reset: $125.40 (+$15.14)                │
-│ 📈 Rate: $6.73/hour                                     │
-│                                                          │
-│ Updated: 21:04:36                                       │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Full Display with Unlimited Overage (Firefox session):**
-```
-┌ Claude Code Usage ──────────────────────────────────────┐
-│ 👤 John Doe (john@company.com)                          │
-│ 🏢 Acme Corporation ENTERPRISE                          │
-│ ⚡ Tier: default_claude_max_5x                          │
-│                                                          │
-│ 5-Hour Limit: ████████████████████ 100%                 │
-│ ⏰ Resets in: 2h 15m                                    │
-│                                                          │
-│ 💳 Overage: $110.26                                     │
-│ 📊 Projected by reset: $125.40 (+$15.14)                │
-│ 📈 Rate: $6.73/hour                                     │
-│                                                          │
-│ Updated: 21:04:36                                       │
-└──────────────────────────────────────────────────────────┘
-```
-
 **With Pace-Maker Integration (when installed):**
 ```
 ┌ Claude Code Usage ──────────────────────────────────────┐
@@ -186,17 +140,11 @@ GET https://api.anthropic.com/api/oauth/profile
 ```
 Returns user account details, organization info, and badges.
 
-**Overage Spending (Session-based):**
-```
-GET https://claude.ai/api/organizations/{org_uuid}/overage_spend_limits
-```
-Returns overage credit usage and monthly limits. Requires browser session authentication (not OAuth).
-
 ### Authentication
 
-The monitor uses two authentication methods:
+The monitor uses OAuth authentication:
 
-**1. OAuth Authentication (Primary):**
+**OAuth Authentication:**
 - **Location**: `~/.claude/.credentials.json`
 - **Token**: `claudeAiOauth.accessToken`
 - **Used for**: Usage data and profile information
@@ -208,14 +156,6 @@ Content-Type: application/json
 anthropic-beta: oauth-2025-04-20
 User-Agent: claude-code/2.0.37
 ```
-
-**2. Firefox Session Authentication (Optional):**
-- **Source**: Firefox cookie database `~/.mozilla/firefox/*/cookies.sqlite`
-- **Cookie**: `sessionKey` from `claude.ai` domain
-- **Used for**: Overage spending and projection data
-- **Auto-refresh**: Every 5 minutes from active Firefox session
-
-The monitor automatically extracts the session key from Firefox if you're logged into claude.ai in Firefox. No manual configuration needed.
 
 ### API Response Formats
 
@@ -253,21 +193,6 @@ The monitor automatically extracts the session key from Firefox if you're logged
 }
 ```
 
-**Overage Response:**
-```json
-{
-  "items": [
-    {
-      "account_uuid": "...",
-      "used_credits": 11026,
-      "monthly_credit_limit": 50000
-    }
-  ]
-}
-```
-
-Note: Credits are converted to dollars at 1 credit = $0.01 (100 credits = $1.00)
-
 ## Technical Details
 
 ### Rate Limits
@@ -277,47 +202,12 @@ Claude Code implements multiple rate limit windows:
 - **7-Day Window**: Extended rate limit (not always active)
 - **Organization-specific limits**: Based on subscription tier
 
-### Overage Projection System
-
-The monitor includes a sophisticated projection system that predicts overage costs:
-
-**How It Works:**
-1. **Data Collection**: Stores usage snapshots every 30 seconds to `~/.claude-usage/usage_history.db`
-2. **Rate Calculation**: Calculates spending rate using progressive fallback windows (30m → 1h → 2h → 4h → 7d)
-3. **Projection**: Projects total overage by reset time using formula: `current + (rate × hours_until_reset)`
-4. **Display**: Shows current overage, projected total, and hourly rate
-
-**Database Schema:**
-```sql
-CREATE TABLE usage_snapshots (
-    timestamp INTEGER PRIMARY KEY,
-    credits_used INTEGER,
-    utilization_percent REAL,
-    resets_at TEXT
-)
-```
-
-**Requirements:**
-- Projection appears after ~30 minutes of data collection
-- 7-day data retention with automatic cleanup
-- Smart rate calculation with progressive fallback for accuracy
-- Non-blocking storage (failures don't affect monitoring)
-
 ### Token Management
 
 OAuth tokens have an expiration time tracked in the credentials file:
 - Tokens are checked for expiry before each API call
 - 5-minute buffer applied to prevent edge cases
 - User prompted to refresh via `claude` command when expired
-
-### Firefox Cookie Extraction
-
-Session key extraction from Firefox:
-- Reads from `~/.mozilla/firefox/*/cookies.sqlite`
-- Copies database to temp file (Firefox locks it when running)
-- Queries `moz_cookies` table for `sessionKey` cookie
-- Refreshes every 5 minutes automatically
-- Fallback to OAuth-only mode if Firefox not available
 
 ### Pace-Maker Integration
 
@@ -361,8 +251,6 @@ curl -I https://api.anthropic.com
 - Requires valid Claude Code authentication
 - Token refresh must be done manually via Claude Code CLI
 - API endpoints are undocumented and may change
-- Overage tracking requires Firefox with active claude.ai session
-- Projection requires 30 minutes of historical data
 - Only monitors 5-hour rate limit window (primary limit)
 - Pace-Maker integration requires separate installation of Claude Pace Maker
 

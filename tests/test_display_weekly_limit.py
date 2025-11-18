@@ -54,9 +54,7 @@ class TestDisplayWeeklyLimit(unittest.TestCase):
             error_message=None,
             last_usage=usage_data,
             last_profile=None,
-            last_overage=None,
             last_update=None,
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=True,
         )
@@ -108,9 +106,7 @@ class TestDisplayWeeklyLimit(unittest.TestCase):
             error_message=None,
             last_usage=usage_data,
             last_profile=None,
-            last_overage=None,
             last_update=None,
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=False,
         )
@@ -157,9 +153,7 @@ class TestDisplayWeeklyLimit(unittest.TestCase):
             error_message=None,
             last_usage=usage_data,
             last_profile=None,
-            last_overage=None,
             last_update=None,
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=False,
         )
@@ -207,9 +201,7 @@ class TestDisplayWeeklyLimit(unittest.TestCase):
             error_message=None,
             last_usage=usage_data,
             last_profile=None,
-            last_overage=None,
             last_update=None,
-            projection=None,
             pacemaker_status=pacemaker_status,
             weekly_limit_enabled=False,
         )

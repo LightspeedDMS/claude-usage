@@ -9,7 +9,6 @@ from rich.console import Console, Group
 from rich.text import Text
 
 from .auth import AdminAuthManager
-from ..shared.auth import FirefoxSessionManager
 from .api import ConsoleAPIClient
 from .storage import ConsoleStorage, ConsoleAnalytics
 from .display import ConsoleRenderer
@@ -32,7 +31,6 @@ class ConsoleMonitor:
 
         # Initialize components
         self.admin_auth_manager = AdminAuthManager(self.credentials_path)
-        self.firefox_manager = FirefoxSessionManager()
         self.storage = ConsoleStorage(db_path)
         self.analytics = ConsoleAnalytics(self.storage)
         self.renderer = ConsoleRenderer()
@@ -132,13 +130,11 @@ class ConsoleMonitor:
             self.mtd_cost["claude_code_user_cost_usd"] = current_user_cost
             self.mtd_cost["current_user_email"] = current_user_email
 
-        # Optional: Claude Code analytics (requires Firefox session key)
-        session_key = self.firefox_manager.extract_session_key()
-
+        # Optional: Claude Code analytics
         org_uuid = self.console_org_data.get("id") if self.console_org_data else None
         self.console_code_analytics, _ = (
             self.console_client.fetch_claude_code_analytics(
-                mtd_start, mtd_end, session_key=session_key, org_uuid=org_uuid
+                mtd_start, mtd_end, session_key=None, org_uuid=org_uuid
             )
         )
 

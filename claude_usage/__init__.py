@@ -7,7 +7,6 @@ from .code_mode.api import ClaudeAPIClient
 from .console_mode.api import ConsoleAPIClient
 from .code_mode.auth import OAuthManager
 from .console_mode.auth import AdminAuthManager
-from .shared.auth import FirefoxSessionManager
 from .code_mode.display import UsageRenderer
 from .console_mode.display import ConsoleRenderer
 from .code_mode.storage import CodeStorage, CodeAnalytics
@@ -74,7 +73,6 @@ __all__ = [
     "ConsoleAPIClient",
     "OAuthManager",
     "AdminAuthManager",
-    "FirefoxSessionManager",
     "UsageRenderer",
     "ConsoleRenderer",
     "CodeStorage",

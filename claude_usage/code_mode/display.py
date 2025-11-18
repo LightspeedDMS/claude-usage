@@ -14,9 +14,7 @@ class UsageRenderer:
         error_message,
         last_usage,
         last_profile,
-        last_overage,
         last_update,
-        projection,
         pacemaker_status=None,
         weekly_limit_enabled=True,
     ):
@@ -44,15 +42,6 @@ class UsageRenderer:
             self._render_seven_day_limit(
                 content, last_usage["seven_day"], weekly_limit_enabled
             )
-
-        # Overage credits
-        if last_overage:
-            # Get current utilization to check if in overage
-            utilization = 0
-            if last_usage and last_usage.get("five_hour"):
-                utilization = last_usage["five_hour"].get("utilization", 0)
-
-            self._render_overage(content, last_overage, projection, utilization)
 
         # Pace-maker status (if available)
         if pacemaker_status:
@@ -209,50 +198,6 @@ class UsageRenderer:
                 )
             else:
                 content.append(Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan"))
-
-    def _render_overage(self, content, overage, projection, utilization):
-        """Render overage and projection display"""
-        used_credits = overage.get("used_credits", 0)
-        monthly_limit = overage.get("monthly_credit_limit")
-
-        if used_credits > 0 or monthly_limit:
-            content.append(Text(""))  # spacing
-
-            # Convert credits to dollars (1 credit = $0.01)
-            used_dollars = used_credits / 100
-
-            if monthly_limit:
-                # Show progress bar if there's a limit
-                limit_dollars = monthly_limit / 100
-                progress = Progress(
-                    TextColumn("[bold]Overage:       [/bold]"),
-                    BarColumn(bar_width=14),
-                    TextColumn("[bold]${task.completed:.2f}/${task.total:.2f}[/bold]"),
-                )
-                _ = progress.add_task(
-                    "overage", total=limit_dollars, completed=used_dollars
-                )
-                content.append(progress)
-            else:
-                # No limit, just show used dollars
-                content.append(
-                    Text(f"💳 Overage: ${used_dollars:.2f}", style="bold yellow")
-                )
-
-            # Projection display - only show when currently in overage (utilization >= 100)
-            if projection and utilization >= 100:
-                current_dollars = projection["current_credits"] / 100
-                projected_dollars = projection["projected_credits"] / 100
-                rate_dollars = projection["rate_per_hour"] / 100
-                increase = projected_dollars - current_dollars
-
-                content.append(
-                    Text(
-                        f"📊 Projected by reset: ${projected_dollars:.2f} (+${increase:.2f})",
-                        style="cyan",
-                    )
-                )
-                content.append(Text(f"📈 Rate: ${rate_dollars:.2f}/hour", style="dim"))
 
     def _render_pacemaker(
         self, content, pm_status, last_usage, weekly_limit_enabled=True

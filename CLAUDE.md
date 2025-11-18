@@ -12,11 +12,10 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 
 - **auth.py**: Authentication management
   - `OAuthManager`: Claude Code OAuth tokens
-  - `FirefoxSessionManager`: Browser session key extraction
   - `AdminAuthManager`: Anthropic Console Admin API keys
 
 - **api.py**: API client wrapper
-  - `ClaudeAPIClient`: Code mode - Usage, profile, and overage endpoints
+  - `ClaudeAPIClient`: Code mode - Usage and profile endpoints
   - `ConsoleAPIClient`: Console mode - Organization, workspaces, MTD reports
 
 - **storage.py**: Database and analytics
@@ -24,7 +23,7 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
   - `UsageAnalytics`: Rate calculation and projections for both modes
 
 - **display.py**: UI rendering
-  - `UsageRenderer`: Code mode - 5-hour limits, overage display
+  - `UsageRenderer`: Code mode - 5-hour limits display
   - `ConsoleRenderer`: Console mode - MTD, model breakdowns, workspaces
 
 - **monitor.py**: Main orchestration
@@ -37,11 +36,7 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 ### Code Mode
 - **OAuth Authentication**: Claude Code OAuth tokens for usage/profile data
 - **5-Hour Limit Tracking**: Real-time utilization percentage and reset countdown
-- **~~Monthly Overage Tracking~~**: **DISABLED** - Cloudflare bot protection blocks access
-  - Anthropic added advanced bot detection to overage API
-  - Returns 403 Forbidden with challenge page
-  - Code kept for reference but disabled to avoid spamming failed requests
-- **7-Day Data Retention**: Smart rate calculation with progressive fallback windows
+- **7-Day Limit Tracking**: Extended rate limit when active
 - **Polling**: Every 30 seconds
 
 ### Console Mode
@@ -61,19 +56,16 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 
 ### Code Mode
 1. OAuth token → usage/profile APIs
-2. Firefox cookies → overage API
-3. Snapshots stored to `~/.claude-usage/usage_history.db` every 30s
-4. Rate calculated from last 30 minutes of snapshots
-5. Projection = current + (rate × hours_until_reset)
+2. Usage data displayed with 5-hour and 7-day limits
+3. Updates every 30 seconds
 
 ### Console Mode
 1. Admin API key → organization/workspaces/reports APIs
 2. MTD date ranges calculated automatically
 3. Per-user Claude Code usage fetched via day-by-day iteration
 4. Current user email identified and matched against usage data
-5. Console snapshots stored to database every 2 minutes
-6. Rate calculated for end-of-month projection
-7. Errors displayed with red border and warning messages
+5. Updates every 2 minutes
+6. Errors displayed with red border and warning messages
 
 ## Technologies
 
