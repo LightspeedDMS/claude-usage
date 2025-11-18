@@ -11,6 +11,62 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 
+def _is_pipx_installation(install_path: str) -> bool:
+    """Check if installation path indicates pipx installation
+
+    Args:
+        install_path: Path from install_source file
+
+    Returns:
+        True if path contains pipx venv structure
+    """
+    return ".local/share/pipx/venvs/" in install_path
+
+
+def _find_pipx_site_packages(install_path: str) -> Optional[str]:
+    """Find site-packages directory in pipx venv
+
+    Args:
+        install_path: Path from install_source file (typically share directory)
+
+    Returns:
+        Path to site-packages directory or None if not found
+    """
+    path = Path(install_path)
+
+    # Navigate up to venv root (from share/claude-pace-maker to venv root)
+    # Typical structure: ~/.local/share/pipx/venvs/claude-pace-maker/share/claude-pace-maker
+    # We need to get to: ~/.local/share/pipx/venvs/claude-pace-maker
+
+    # Find the venv root by looking for parent containing 'venvs' directory
+    current = path
+    venv_root = None
+
+    # Go up the directory tree to find venv root
+    while current.parent != current:  # Stop at filesystem root
+        if current.parent.name == "venvs":
+            venv_root = current
+            break
+        current = current.parent
+
+    if not venv_root:
+        return None
+
+    # Look for lib/pythonX.Y/site-packages
+    lib_dir = venv_root / "lib"
+    if not lib_dir.exists():
+        return None
+
+    # Find any pythonX.Y directory
+    for python_dir in lib_dir.iterdir():
+        if python_dir.is_dir() and python_dir.name.startswith("python"):
+            site_packages = python_dir / "site-packages"
+            if site_packages.exists():
+                return str(site_packages)
+
+    return None
+
+
 class PaceMakerReader:
     """Reads pace-maker state from database and config files"""
 
@@ -83,13 +139,22 @@ class PaceMakerReader:
             # Try to find pace-maker source directory
             pm_src = None
 
-            # Check if install_source file exists (points to dev directory)
+            # Check if install_source file exists
             install_source_file = self.pm_dir / "install_source"
             if install_source_file.exists():
                 try:
                     with open(install_source_file) as f:
-                        source_dir = Path(f.read().strip())
-                        pm_src = source_dir / "src"
+                        source_path = f.read().strip()
+
+                        # Check if this is a pipx installation
+                        if _is_pipx_installation(source_path):
+                            # Find site-packages in pipx venv
+                            site_packages = _find_pipx_site_packages(source_path)
+                            if site_packages:
+                                pm_src = Path(site_packages)
+                        else:
+                            # Regular dev installation - use src directory
+                            pm_src = Path(source_path) / "src"
                 except (OSError, ValueError):
                     pass
 
