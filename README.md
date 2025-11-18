@@ -1,21 +1,28 @@
-# Claude Code Usage Monitor
+# Claude Usage Monitor
 
-A live-updating terminal dashboard for monitoring Claude Code account usage and rate limits.
+A live-updating terminal dashboard for monitoring Claude account usage and rate limits. Supports dual-mode operation for both Claude Code users and organization administrators.
 
 ## Overview
 
-This tool continuously monitors your Claude Code account usage through the Claude Code API, displaying real-time usage statistics and reset timers directly in your terminal.
+This tool monitors Claude account usage through multiple APIs, displaying real-time usage statistics and cost tracking directly in your terminal. Automatically detects and switches between Code mode (personal usage) and Console mode (organization-wide tracking).
 
 ## Features
 
-- **Live Updates**: Continuously polls usage data every 30 seconds
-- **Profile Information**: Display name, email, organization name
-- **Account Badges**: Shows Enterprise, Pro, or Max account status
-- **Rate Limit Tier**: Displays your current rate limit tier
-- **Progress Bars**: Visual representation of usage percentage with color coding
-- **Multiple Rate Limits**: Shows 5-hour and 7-day limits when active
-- **Reset Timer**: Countdown to next rate limit reset
-- **Pace-Maker Integration**: Displays throttling status and tempo tracking when Claude Pace Maker installed
+- **Dual Mode Support**: Automatic detection between Code mode and Console mode
+- **Live Updates**: Polls every 30 seconds (Code mode) or 2 minutes (Console mode)
+- **Code Mode**:
+  - Profile Information: Display name, email, organization name
+  - Account Badges: Shows Enterprise, Pro, or Max account status
+  - Rate Limit Tier: Displays your current rate limit tier
+  - Progress Bars: Visual representation of usage percentage with color coding
+  - Multiple Rate Limits: Shows 5-hour and 7-day limits when active
+  - Reset Timer: Countdown to next rate limit reset
+  - Pace-Maker Integration: Displays throttling status and tempo tracking when Claude Pace Maker installed
+- **Console Mode**:
+  - Organization-wide MTD cost tracking
+  - Per-User Tracking: Shows your individual Claude Code usage
+  - Cost Projections: End-of-month cost forecasting based on current usage rate
+  - Current user identification and personalized display
 - **In-Place Refresh**: Clean display that updates without scrolling
 - **Auto Token Detection**: Automatically loads OAuth credentials from Claude Code
 - **Token Expiry Handling**: Detects expired tokens and prompts for refresh
@@ -77,6 +84,18 @@ The command is globally accessible from any directory.
 
 Press `Ctrl+C` to stop monitoring.
 
+### Mode Selection
+
+The monitor automatically detects which mode to use based on available credentials:
+- **Code Mode**: Uses Claude Code OAuth tokens (default for Claude Code users)
+- **Console Mode**: Uses Anthropic Admin API key (for organization administrators)
+
+Override automatic detection:
+```bash
+claude-usage --mode code    # Force Code mode
+claude-usage --mode console # Force Console mode
+```
+
 ### Example Output
 
 **Basic Display (OAuth only):**
@@ -100,17 +119,19 @@ Press Ctrl+C to stop
 ```
 ┌ Claude Code Usage ──────────────────────────────────────┐
 │ 👤 John Doe (john@company.com)                          │
-│ 🏢 Acme Corporation ENTERPRISE                          │
+│ 🏢 Acme Corporation                                     │
+│    Plan: ENTERPRISE                                     │
 │ ⚡ Tier: default_claude_max_5x                          │
 │                                                          │
-│ 5-Hour Limit: ████████████████░░░░ 78%                  │
+│ 5-Hour Usage:  ████████████████░░░░ 78%                 │
 │ ⏰ Resets in: 3h 45m                                    │
 │                                                          │
-│ 🎯 Pace Maker: ACTIVE (adaptive)                        │
-│    Status: THROTTLING (ahead of pace)                   │
-│    Constrained window: 5-hour                           │
-│    Deviation: +15.2% (78.0% vs target 62.8%)            │
-│    Delay: 45s per request                               │
+│ 🎯 Pace Maker: ⚠️ THROTTLING                            │
+│ 5-Hour Target: ████████████░░░░░░░░ 62%                 │
+│ Deviation: +15.2% (over budget)                         │
+│ ⏱️  Next delay: 45s per tool use                        │
+│ Algorithm: adaptive/preload                             │
+│ Tempo: enabled                                          │
 │                                                          │
 │ Updated: 21:04:36                                       │
 └──────────────────────────────────────────────────────────┘
@@ -121,6 +142,22 @@ Press Ctrl+C to stop
 - 🟡 **51-80%**: Yellow
 - 🟠 **81-99%**: Orange
 - 🔴 **100%**: Red
+
+**Console Mode (Admin API):**
+```
+┌ Console Usage ──────────────────────────────┐
+│ 🏢 Acme Corporation                         │
+│                                             │
+│ ═══ Month-to-Date (Nov 1-18) ═══           │
+│ Your Claude Code Usage: $45.23             │
+│ (john@company.com)                         │
+│                                             │
+│ Projected by end of month: $75.50 (+$30.27)│
+│ Rate: $2.51/hour                           │
+│                                             │
+│ Updated: 14:23:15                          │
+└─────────────────────────────────────────────┘
+```
 
 ## How It Works
 
@@ -140,11 +177,20 @@ GET https://api.anthropic.com/api/oauth/profile
 ```
 Returns user account details, organization info, and badges.
 
+**Console API Endpoints (Admin API):**
+```
+GET https://api.anthropic.com/v1/organizations/{org_id}
+GET https://api.anthropic.com/v1/organizations/{org_id}/workspaces
+GET https://api.anthropic.com/v1/organizations/{org_id}/cost-report
+GET https://api.anthropic.com/v1/organizations/{org_id}/usage_report/claude_code
+GET https://api.anthropic.com/v1/organizations/users
+```
+
 ### Authentication
 
-The monitor uses OAuth authentication:
+The monitor supports multiple authentication methods:
 
-**OAuth Authentication:**
+**OAuth Authentication (Code Mode):**
 - **Location**: `~/.claude/.credentials.json`
 - **Token**: `claudeAiOauth.accessToken`
 - **Used for**: Usage data and profile information
@@ -155,6 +201,17 @@ Authorization: Bearer {accessToken}
 Content-Type: application/json
 anthropic-beta: oauth-2025-04-20
 User-Agent: claude-code/2.0.37
+```
+
+**Admin API Authentication (Console Mode):**
+- **Environment Variable**: `ANTHROPIC_ADMIN_API_KEY=sk-ant-admin-...`
+- **Credentials File**: `~/.claude/.credentials.json` with `anthropicConsole.adminApiKey`
+- **Used for**: Organization usage, MTD cost reports, per-user Claude Code tracking
+
+Required headers:
+```http
+x-api-key: {adminApiKey}
+anthropic-version: 2023-06-01
 ```
 
 ### API Response Formats
@@ -248,10 +305,11 @@ curl -I https://api.anthropic.com
 
 ## Limitations
 
-- Requires valid Claude Code authentication
+- Requires valid Claude Code authentication (Code mode) or Admin API key (Console mode)
 - Token refresh must be done manually via Claude Code CLI
 - API endpoints are undocumented and may change
-- Only monitors 5-hour rate limit window (primary limit)
+- Console mode limited to MTD period (current month only)
+- Console mode shows only current user's Claude Code usage, not organization-wide
 - Pace-Maker integration requires separate installation of Claude Pace Maker
 
 ## Contributing
