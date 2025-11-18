@@ -92,7 +92,10 @@ class OAuthManager:
 
                     if error:
                         # Keychain extraction failed, return expired token with error
-                        return credentials, "Token expired. Please run 'claude' to refresh."
+                        return (
+                            credentials,
+                            "Token expired. Please run 'claude' to refresh.",
+                        )
 
                     # Successfully extracted fresh token from Keychain
                     # Save to file for future use

@@ -73,7 +73,9 @@ class CodeMonitor:
             self._load_credentials()
 
             # After reload, check if we still have expired token or no credentials
-            if not self.credentials or self.oauth_manager.is_token_expired(self.credentials):
+            if not self.credentials or self.oauth_manager.is_token_expired(
+                self.credentials
+            ):
                 return False
 
         # Make API request

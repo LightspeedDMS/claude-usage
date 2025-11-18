@@ -1,7 +1,6 @@
 """UI rendering for Code mode usage monitor"""
 
 from datetime import datetime
-from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn
 from rich.text import Text
 from rich.console import Group
@@ -24,18 +23,10 @@ class UsageRenderer:
         """Generate rich display for current usage"""
 
         if error_message:
-            return Panel(
-                f"[red]⚠ {error_message}[/red]",
-                title="Claude Code Usage",
-                border_style="red",
-            )
+            return Text(f"[red]⚠ {error_message}[/red]")
 
         if not last_usage:
-            return Panel(
-                "[yellow]Fetching usage data...[/yellow]",
-                title="Claude Code Usage",
-                border_style="yellow",
-            )
+            return Text("[yellow]Fetching usage data...[/yellow]")
 
         # Build display content
         content = []
@@ -76,9 +67,7 @@ class UsageRenderer:
             content.append(Text(f"Updated: {update_str}", style="dim"))
 
         # Combine content
-        display = Group(*content)
-
-        return Panel(display, title="Claude Code Usage", border_style="green")
+        return Group(*content)
 
     def _render_profile(self, content, profile):
         """Render profile information"""
