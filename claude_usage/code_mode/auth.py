@@ -116,7 +116,7 @@ class OAuthManager:
                 data, error = self.extract_from_macos_keychain()
 
                 if error:
-                    return None, f"Failed to load credentials: {error}"
+                    return None, "Credentials not found. Please run 'claude' to authenticate."
 
                 # Save to file for future use
                 save_success, save_error = self.save_credentials_file(data)
