@@ -19,7 +19,7 @@ console = Console()
 class ConsoleMonitor:
     """Monitor Anthropic Console organization usage via Admin API"""
 
-    POLL_INTERVAL = 120  # seconds (2 minutes)
+    POLL_INTERVAL = 300  # seconds (5 minutes)
 
     def __init__(self, credentials_path=None):
         if credentials_path is None:
