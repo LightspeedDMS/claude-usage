@@ -43,6 +43,9 @@ class UsageRenderer:
                 content, last_usage["seven_day"], weekly_limit_enabled
             )
 
+        # Model-specific 7-day limits (Sonnet, Opus) if available
+        self._render_model_specific_limits(content, last_usage)
+
         # Pace-maker status (if available)
         if pacemaker_status:
             self._render_pacemaker(
@@ -180,6 +183,80 @@ class UsageRenderer:
         # Throttling disabled note below progress bar
         if not weekly_limit_enabled:
             content.append(Text("(throttling disabled)", style="dim"))
+
+        if resets_at:
+            reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
+            now = datetime.utcnow()
+            time_until = reset_time - now
+
+            # Calculate days, hours, and minutes
+            days = time_until.days
+            hours = time_until.seconds // 3600
+            minutes = (time_until.seconds % 3600) // 60
+
+            # Format the countdown message
+            if days > 0:
+                content.append(
+                    Text(f"⏰ Resets in: {days}d {hours}h {minutes}m", style="cyan")
+                )
+            else:
+                content.append(Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan"))
+
+    def _render_model_specific_limits(self, content, usage_data):
+        """Render model-specific 7-day usage limits (Sonnet, Opus) if available
+
+        Args:
+            content: List to append rendered content to
+            usage_data: Usage data dict that may contain seven_day_sonnet and seven_day_opus
+        """
+        # Check and render Sonnet limit
+        if usage_data.get("seven_day_sonnet"):
+            self._render_model_limit(content, usage_data["seven_day_sonnet"], "Sonnet")
+
+        # Check and render Opus limit
+        if usage_data.get("seven_day_opus"):
+            self._render_model_limit(content, usage_data["seven_day_opus"], "Opus")
+
+    def _render_model_limit(self, content, model_data, model_name):
+        """Render a single model-specific 7-day limit
+
+        Args:
+            content: List to append rendered content to
+            model_data: Model-specific usage data (utilization, resets_at)
+            model_name: Display name for the model (e.g., "Sonnet", "Opus")
+        """
+        utilization = model_data.get("utilization", 0)
+        resets_at = model_data.get("resets_at", "")
+
+        # Determine color based on utilization (same logic as other limits)
+        if utilization >= 100:
+            bar_style = "bold red"
+        elif utilization >= 81:
+            bar_style = "bold bright_yellow"
+        elif utilization >= 51:
+            bar_style = "bold yellow"
+        else:
+            bar_style = "bold green"
+
+        # Create label padded to 15 chars for alignment
+        # "7-Day Sonnet:" = 13 chars, "7-Day Opus:" = 11 chars
+        label = f"7-Day {model_name}:"
+        padding = " " * (15 - len(label))
+
+        # Progress bar
+        progress = Progress(
+            TextColumn(f"[bold]{label}{padding}[/bold]"),
+            BarColumn(
+                bar_width=14,
+                complete_style=bar_style,
+                finished_style=bar_style,
+            ),
+            TextColumn("[bold]{task.percentage:>3.0f}%[/bold]"),
+        )
+        _ = progress.add_task("usage", total=100, completed=utilization)
+
+        content.append(Text(""))  # spacing
+        content.append(progress)
 
         if resets_at:
             reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
