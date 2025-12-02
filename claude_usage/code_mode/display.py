@@ -415,3 +415,9 @@ class UsageRenderer:
         tempo_text = "enabled" if tempo_enabled else "disabled"
         tempo_style = "dim" if tempo_enabled else "yellow"
         content.append(Text(f"Tempo: {tempo_text}", style=tempo_style))
+
+        # Subagent reminder status
+        reminder_enabled = pm_status.get("subagent_reminder_enabled", True)
+        reminder_text = "enabled" if reminder_enabled else "disabled"
+        reminder_style = "dim" if reminder_enabled else "yellow"
+        content.append(Text(f"Reminder: {reminder_text}", style=reminder_style))

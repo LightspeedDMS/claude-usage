@@ -195,6 +195,9 @@ class PaceMakerReader:
                 "strategy": decision.get("strategy", "unknown"),
                 "weekly_limit_enabled": config.get("weekly_limit_enabled", True),
                 "tempo_enabled": config.get("tempo_enabled", True),
+                "subagent_reminder_enabled": config.get(
+                    "subagent_reminder_enabled", True
+                ),
                 "last_update": usage_data["timestamp"],
             }
 
