@@ -148,9 +148,17 @@ class UsageRenderer:
 
         content.append(progress)
 
-        # Throttling disabled note below progress bar
-        if not five_hour_limit_enabled:
-            content.append(Text("(throttling disabled)", style="dim"))
+        # 5-Hour limiter status (always shown, like other status indicators)
+        if five_hour_limit_enabled:
+            content.append(
+                Text.from_markup("5-Hour Limiter: [green]enabled[/green]", style="dim")
+            )
+        else:
+            content.append(
+                Text.from_markup(
+                    "5-Hour Limiter: [yellow]disabled[/yellow]", style="dim"
+                )
+            )
 
         if resets_at:
             reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
