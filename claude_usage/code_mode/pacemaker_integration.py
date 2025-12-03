@@ -194,9 +194,13 @@ class PaceMakerReader:
                 "algorithm": decision.get("algorithm", "legacy"),
                 "strategy": decision.get("strategy", "unknown"),
                 "weekly_limit_enabled": config.get("weekly_limit_enabled", True),
+                "five_hour_limit_enabled": config.get("five_hour_limit_enabled", True),
                 "tempo_enabled": config.get("tempo_enabled", True),
                 "subagent_reminder_enabled": config.get(
                     "subagent_reminder_enabled", True
+                ),
+                "intent_validation_enabled": config.get(
+                    "intent_validation_enabled", False
                 ),
                 "last_update": usage_data["timestamp"],
             }

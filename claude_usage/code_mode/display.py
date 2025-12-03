@@ -35,7 +35,14 @@ class UsageRenderer:
 
         # Five-hour limit
         if last_usage.get("five_hour"):
-            self._render_five_hour_limit(content, last_usage["five_hour"])
+            five_hour_limit_enabled = True
+            if pacemaker_status:
+                five_hour_limit_enabled = pacemaker_status.get(
+                    "five_hour_limit_enabled", True
+                )
+            self._render_five_hour_limit(
+                content, last_usage["five_hour"], five_hour_limit_enabled
+            )
 
         # Seven-day limit (always show if data available)
         if last_usage.get("seven_day"):
@@ -106,8 +113,14 @@ class UsageRenderer:
         if content:
             content.append(Text(""))  # spacing
 
-    def _render_five_hour_limit(self, content, five_hour):
-        """Render five-hour usage display"""
+    def _render_five_hour_limit(self, content, five_hour, five_hour_limit_enabled=True):
+        """Render five-hour usage display
+
+        Args:
+            content: List to append rendered content to
+            five_hour: Five-hour usage data
+            five_hour_limit_enabled: Whether five-hour throttling is enabled (affects display note only)
+        """
         utilization = five_hour.get("utilization", 0)
         resets_at = five_hour.get("resets_at", "")
 
@@ -134,6 +147,10 @@ class UsageRenderer:
         _ = progress.add_task("usage", total=100, completed=utilization)
 
         content.append(progress)
+
+        # Throttling disabled note below progress bar
+        if not five_hour_limit_enabled:
+            content.append(Text("(throttling disabled)", style="dim"))
 
         if resets_at:
             reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
@@ -412,12 +429,39 @@ class UsageRenderer:
 
         # Tempo tracking status
         tempo_enabled = pm_status.get("tempo_enabled", True)
-        tempo_text = "enabled" if tempo_enabled else "disabled"
-        tempo_style = "dim" if tempo_enabled else "yellow"
-        content.append(Text(f"Tempo: {tempo_text}", style=tempo_style))
+        if tempo_enabled:
+            content.append(
+                Text.from_markup("Tempo: [green]enabled[/green]", style="dim")
+            )
+        else:
+            content.append(
+                Text.from_markup("Tempo: [yellow]disabled[/yellow]", style="dim")
+            )
 
         # Subagent reminder status
         reminder_enabled = pm_status.get("subagent_reminder_enabled", True)
-        reminder_text = "enabled" if reminder_enabled else "disabled"
-        reminder_style = "dim" if reminder_enabled else "yellow"
-        content.append(Text(f"Subagent Nudge: {reminder_text}", style=reminder_style))
+        if reminder_enabled:
+            content.append(
+                Text.from_markup("Subagent Nudge: [green]enabled[/green]", style="dim")
+            )
+        else:
+            content.append(
+                Text.from_markup(
+                    "Subagent Nudge: [yellow]disabled[/yellow]", style="dim"
+                )
+            )
+
+        # Intent validation status
+        intent_enabled = pm_status.get("intent_validation_enabled", False)
+        if intent_enabled:
+            content.append(
+                Text.from_markup(
+                    "Intent Validation: [green]enabled[/green]", style="dim"
+                )
+            )
+        else:
+            content.append(
+                Text.from_markup(
+                    "Intent Validation: [yellow]disabled[/yellow]", style="dim"
+                )
+            )
