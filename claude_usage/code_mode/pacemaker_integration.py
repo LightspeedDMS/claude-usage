@@ -182,7 +182,7 @@ class PaceMakerReader:
                 weekly_limit_enabled=config.get("weekly_limit_enabled", True),
             )
 
-            return {
+            status_result = {
                 "enabled": enabled,
                 "has_data": True,
                 "five_hour": decision["five_hour"],
@@ -204,6 +204,15 @@ class PaceMakerReader:
                 ),
                 "last_update": usage_data["timestamp"],
             }
+
+            # Propagate stale data flag if present
+            # Use 'is True' to avoid false positives from MagicMock objects in tests
+            if decision.get("stale_data") is True:
+                status_result["stale_data"] = True
+                if decision.get("error"):
+                    status_result["error"] = decision["error"]
+
+            return status_result
 
         except ImportError:
             # Pace-maker not installed or import failed
