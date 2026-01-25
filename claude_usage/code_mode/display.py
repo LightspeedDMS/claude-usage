@@ -324,7 +324,9 @@ class UsageRenderer:
 
         # Check for errors
         if "error" in pm_status:
-            content.append(Text("🎯 Pace Maker: [yellow]ERROR[/yellow]", style="bold"))
+            content.append(
+                Text.from_markup("🎯 Pace Maker: [bold yellow]ERROR[/bold yellow]")
+            )
             content.append(Text(f"{pm_status['error']}", style="dim"))
             return
 
