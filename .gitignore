@@ -46,3 +46,4 @@ coverage.json
 
 # MCP Server
 .ssh-mcp-server.port
+/MagicMock

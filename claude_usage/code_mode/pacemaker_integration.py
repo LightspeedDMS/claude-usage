@@ -76,6 +76,10 @@ class PaceMakerReader:
         self.config_path = self.pm_dir / "config.json"
         self.db_path = self.pm_dir / "usage.db"
         self.state_path = self.pm_dir / "state.json"
+        # Cache for blockage stats (AC4)
+        self._blockage_stats_cache = None
+        self._blockage_stats_cache_time = 0
+        self._cache_ttl_seconds = 5
 
     def is_installed(self) -> bool:
         """Check if pace-maker is installed"""
@@ -283,3 +287,123 @@ class PaceMakerReader:
 
         except (sqlite3.Error, OSError):
             return None
+
+    def get_blockage_stats(self) -> Optional[Dict[str, int]]:
+        """Get blockage counts per category for the last 60 minutes.
+
+        Returns:
+            Dict mapping each category to its count (zero-filled for missing categories),
+            plus a 'total' key with sum of all counts.
+            Returns None if database is unavailable.
+        """
+        # Define all expected categories (matching pace-maker constants)
+        categories = [
+            "intent_validation",
+            "intent_validation_tdd",
+            "intent_validation_cleancode",
+            "pacing_tempo",
+            "pacing_quota",
+            "other",
+        ]
+
+        if not self.is_installed():
+            return None
+
+        if not self.db_path.exists():
+            return None
+
+        try:
+            import time
+
+            # Calculate cutoff timestamp (60 minutes ago)
+            cutoff_timestamp = int(time.time()) - 3600
+
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+
+            # Query counts grouped by category
+            cursor.execute(
+                """
+                SELECT category, COUNT(*) as count
+                FROM blockage_events
+                WHERE timestamp >= ?
+                GROUP BY category
+                """,
+                (cutoff_timestamp,),
+            )
+
+            # Initialize result with all categories set to 0
+            result = {category: 0 for category in categories}
+
+            # Update result with actual counts
+            for row in cursor.fetchall():
+                category, count = row
+                if category in result:
+                    result[category] = count
+
+            conn.close()
+
+            # Add total
+            result["total"] = sum(result[cat] for cat in categories)
+
+            return result
+
+        except (sqlite3.Error, OSError):
+            return None
+
+    def get_blockage_stats_with_labels(self) -> Optional[Dict[str, int]]:
+        """Get blockage stats with human-readable category labels.
+
+        Returns:
+            Dict mapping human-readable labels to counts, plus 'Total'.
+            Returns None if database is unavailable.
+        """
+        # Human-readable labels for categories (excluding 'other' - catch-all that's rarely used)
+        category_labels = {
+            "intent_validation": "Intent Validation",
+            "intent_validation_tdd": "Intent TDD",
+            "intent_validation_cleancode": "Clean Code",
+            "pacing_tempo": "Pacing Tempo",
+            "pacing_quota": "Pacing Quota",
+        }
+
+        stats = self.get_blockage_stats()
+        if stats is None:
+            return None
+
+        # Convert to human-readable labels
+        result = {}
+        for category, label in category_labels.items():
+            result[label] = stats.get(category, 0)
+
+        result["Total"] = stats.get("total", 0)
+        return result
+
+    def get_blockage_stats_cached(self) -> Optional[Dict[str, int]]:
+        """Get blockage stats with caching to avoid excessive database queries.
+
+        Returns cached result if cache is valid (within TTL), otherwise
+        fetches fresh data from database.
+
+        Returns:
+            Dict mapping each category to its count, plus 'total'.
+            Returns None if database is unavailable.
+        """
+        import time
+
+        current_time = time.time()
+
+        # Check if cache is valid
+        if self._blockage_stats_cache is not None:
+            cache_age = current_time - self._blockage_stats_cache_time
+            if cache_age < self._cache_ttl_seconds:
+                return self._blockage_stats_cache
+
+        # Cache miss or expired - fetch fresh data
+        fresh_stats = self.get_blockage_stats()
+
+        # Update cache
+        self._blockage_stats_cache = fresh_stats
+        self._blockage_stats_cache_time = current_time
+
+        return fresh_stats

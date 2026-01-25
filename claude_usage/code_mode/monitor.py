@@ -112,14 +112,17 @@ class CodeMonitor:
         # Get pace-maker status if installed
         pacemaker_status = None
         weekly_limit_enabled = True  # Default
+        blockage_stats = None
         if self.pacemaker_reader.is_installed():
             pacemaker_status = self.pacemaker_reader.get_status()
             if pacemaker_status:
                 weekly_limit_enabled = pacemaker_status.get(
                     "weekly_limit_enabled", True
                 )
+            # Fetch blockage stats for the two-column bottom section
+            blockage_stats = self.pacemaker_reader.get_blockage_stats_with_labels()
 
-        return self.renderer.render(
+        main_display = self.renderer.render(
             self.error_message,
             self.last_usage,
             self.last_profile,
@@ -127,6 +130,15 @@ class CodeMonitor:
             pacemaker_status,
             weekly_limit_enabled=weekly_limit_enabled,
         )
+
+        # Add bottom section with blockage stats if pacemaker is available
+        if pacemaker_status and pacemaker_status.get("has_data"):
+            bottom_section = self.renderer.render_bottom_section(
+                pacemaker_status, blockage_stats, self.last_update
+            )
+            return Group(main_display, bottom_section)
+
+        return main_display
 
     def run(self):
         """Main run loop for Code mode monitoring"""
@@ -139,7 +151,7 @@ class CodeMonitor:
                     # Show initial display before fetching
                     display = self.get_display()
                     instruction = Text("Press Ctrl+C to stop", style="dim")
-                    live.update(Group(display, Text(""), instruction))
+                    live.update(Group(display, instruction))
 
                     # Fetch usage
                     self.fetch_usage()
@@ -147,7 +159,7 @@ class CodeMonitor:
                     # Update display again after fetching
                     display = self.get_display()
                     instruction = Text("Press Ctrl+C to stop", style="dim")
-                    live.update(Group(display, Text(""), instruction))
+                    live.update(Group(display, instruction))
 
                     # Wait before next poll
                     time.sleep(self.POLL_INTERVAL)

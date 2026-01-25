@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from rich.progress import BarColumn, Progress, TextColumn
+from rich.table import Table
 from rich.text import Text
 from rich.console import Group
 
@@ -59,13 +60,7 @@ class UsageRenderer:
                 content, pacemaker_status, last_usage, weekly_limit_enabled
             )
 
-        # Last update time
-        if last_update:
-            update_str = last_update.strftime("%H:%M:%S")
-            content.append(Text(""))  # spacing
-            content.append(Text(f"Updated: {update_str}", style="dim"))
-
-        # Combine content
+        # Combine content (Updated time moved to bottom section)
         return Group(*content)
 
     def _render_profile(self, content, profile):
@@ -426,50 +421,91 @@ class UsageRenderer:
                 )
             )
 
-        # Algorithm info (compact)
-        algorithm = pm_status.get("algorithm", "legacy")
-        strategy = pm_status.get("strategy", "")
-        if algorithm == "adaptive" and strategy:
-            algo_text = f"adaptive/{strategy}"
-        else:
-            algo_text = algorithm
-        content.append(Text(f"Algorithm: {algo_text}", style="dim"))
+        # Note: Status indicators (Algorithm, Tempo, Subagent, Intent Validation)
+        # are now displayed in the two-column bottom section via render_bottom_section()
 
-        # Tempo tracking status
-        tempo_enabled = pm_status.get("tempo_enabled", True)
+    def render_bottom_section(self, pacemaker_status, blockage_stats, last_update=None):
+        """Render two-column bottom section with status and blockage stats.
+
+        Args:
+            pacemaker_status: Dict with pace-maker status info
+            blockage_stats: Dict with human-readable blockage category labels and counts
+            last_update: Optional datetime of last data update
+
+        Returns:
+            Rich renderable Group with two-column layout
+        """
+        # Layout constants
+        status_col_width = 22
+        status_separator = "-" * 18
+        blockage_separator = "-" * 21  # 1 char longer than "Blockages (last hour)"
+        count_width = 4
+
+        # Create two-column table
+        table = Table.grid(padding=(0, 2))
+        table.add_column("status", width=status_col_width)
+        table.add_column("blockage", ratio=1)
+
+        # Build left column - Status indicators
+        left_lines = []
+        left_lines.append("[bold]Pacing Status[/bold]")
+        left_lines.append(status_separator)
+
+        # Algorithm status
+        algorithm = pacemaker_status.get("algorithm", "unknown")
+        enabled = pacemaker_status.get("enabled", False)
+        if enabled:
+            left_lines.append(f"Algorithm: [green]{algorithm}[/green]")
+        else:
+            left_lines.append("Algorithm: [dim]inactive[/dim]")
+
+        # Tempo status
+        tempo_enabled = pacemaker_status.get("tempo_enabled", True)
         if tempo_enabled:
-            content.append(
-                Text.from_markup("Tempo: [green]enabled[/green]", style="dim")
-            )
+            left_lines.append("Tempo: [green]on[/green]")
         else:
-            content.append(
-                Text.from_markup("Tempo: [yellow]disabled[/yellow]", style="dim")
-            )
+            left_lines.append("Tempo: [yellow]off[/yellow]")
 
-        # Subagent reminder status
-        reminder_enabled = pm_status.get("subagent_reminder_enabled", True)
-        if reminder_enabled:
-            content.append(
-                Text.from_markup("Subagent Nudge: [green]enabled[/green]", style="dim")
-            )
+        # Subagent status
+        subagent_enabled = pacemaker_status.get("subagent_reminder_enabled", True)
+        if subagent_enabled:
+            left_lines.append("Subagent: [green]on[/green]")
         else:
-            content.append(
-                Text.from_markup(
-                    "Subagent Nudge: [yellow]disabled[/yellow]", style="dim"
-                )
-            )
+            left_lines.append("Subagent: [dim]idle[/dim]")
 
         # Intent validation status
-        intent_enabled = pm_status.get("intent_validation_enabled", False)
+        intent_enabled = pacemaker_status.get("intent_validation_enabled", False)
         if intent_enabled:
-            content.append(
-                Text.from_markup(
-                    "Intent Validation: [green]enabled[/green]", style="dim"
-                )
-            )
+            left_lines.append("Intent Val: [green]on[/green]")
         else:
-            content.append(
-                Text.from_markup(
-                    "Intent Validation: [yellow]disabled[/yellow]", style="dim"
-                )
-            )
+            left_lines.append("Intent Val: [yellow]off[/yellow]")
+
+        # Last update time (no blank line - compact layout)
+        if last_update:
+            update_str = last_update.strftime("%H:%M:%S")
+            left_lines.append(f"[dim]Updated: {update_str}[/dim]")
+
+        left_content = Text.from_markup("\n".join(left_lines))
+
+        # Build right column - Blockage statistics
+        right_lines = []
+        right_lines.append("[bold]Blockages (last hour)[/bold]")
+        right_lines.append(blockage_separator)
+
+        if blockage_stats:
+            # Get categories from stats (excluding Total)
+            for category, count in blockage_stats.items():
+                if category != "Total":
+                    right_lines.append(f"{category}:{count:>{count_width}}")
+
+            total = blockage_stats.get("Total", 0)
+            right_lines.append(f"[bold]Total:{total:>{count_width}}[/bold]")
+        else:
+            right_lines.append("(unavailable)")
+
+        right_content = Text.from_markup("\n".join(right_lines))
+
+        # Add row to table
+        table.add_row(left_content, right_content)
+
+        return Group(table)
