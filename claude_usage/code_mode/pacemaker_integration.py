@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
 
+# Constants for time calculations
+SECONDS_IN_24_HOURS = 86400
+
+# Default clean code rules count from pace-maker
+DEFAULT_CLEAN_CODE_RULES_COUNT = 17
+
 
 def _is_pipx_installation(install_path: str) -> bool:
     """Check if installation path indicates pipx installation
@@ -115,7 +121,10 @@ class PaceMakerReader:
                 'should_throttle': bool,
                 'delay_seconds': int,
                 'algorithm': str ('adaptive' or 'legacy'),
-                'last_update': datetime
+                'last_update': datetime,
+                'tdd_enabled': bool,
+                'preferred_subagent_model': str,
+                'clean_code_rules_count': int
             }
         """
         if not self.is_installed():
@@ -133,6 +142,11 @@ class PaceMakerReader:
             return {
                 "enabled": enabled,
                 "has_data": False,
+                "tdd_enabled": config.get("tdd_enabled", False),
+                "preferred_subagent_model": config.get(
+                    "preferred_subagent_model", "auto"
+                ),
+                "clean_code_rules_count": self._get_clean_code_rules_count(),
             }
 
         # Calculate pacing decision using pace-maker's algorithm
@@ -206,6 +220,11 @@ class PaceMakerReader:
                 "intent_validation_enabled": config.get(
                     "intent_validation_enabled", False
                 ),
+                "tdd_enabled": config.get("tdd_enabled", False),
+                "preferred_subagent_model": config.get(
+                    "preferred_subagent_model", "auto"
+                ),
+                "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "last_update": usage_data["timestamp"],
             }
 
@@ -224,6 +243,11 @@ class PaceMakerReader:
                 "enabled": enabled,
                 "has_data": True,
                 "error": "Cannot import pace-maker modules",
+                "tdd_enabled": config.get("tdd_enabled", False),
+                "preferred_subagent_model": config.get(
+                    "preferred_subagent_model", "auto"
+                ),
+                "clean_code_rules_count": self._get_clean_code_rules_count(),
             }
 
     def _read_config(self) -> Optional[Dict[str, Any]]:
@@ -407,3 +431,150 @@ class PaceMakerReader:
         self._blockage_stats_cache_time = current_time
 
         return fresh_stats
+
+    def get_langfuse_metrics(self) -> Optional[Dict[str, int]]:
+        """Get Langfuse metrics for the last 24 hours.
+
+        Reads from langfuse_metrics table in pace-maker database and sums
+        all buckets within the 24-hour window.
+
+        Returns:
+            Dict with keys:
+            - sessions: Total sessions created in last 24h
+            - traces: Total traces created in last 24h
+            - spans: Total spans created in last 24h
+            - total: Sum of all three metrics
+            Returns None if database is unavailable or table doesn't exist.
+        """
+        if not self.db_path.exists():
+            return None
+
+        try:
+            import time
+
+            cutoff = time.time() - SECONDS_IN_24_HOURS
+
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                cursor = conn.cursor()
+
+                # Query sum of all metrics within 24-hour window
+                cursor.execute(
+                    """
+                    SELECT COALESCE(SUM(sessions_count), 0),
+                           COALESCE(SUM(traces_count), 0),
+                           COALESCE(SUM(spans_count), 0)
+                    FROM langfuse_metrics
+                    WHERE bucket_timestamp >= ?
+                    """,
+                    (cutoff,),
+                )
+
+                row = cursor.fetchone()
+
+                if not row:
+                    return None
+
+                sessions = int(row[0])
+                traces = int(row[1])
+                spans = int(row[2])
+                total = sessions + traces + spans
+
+                return {
+                    "sessions": sessions,
+                    "traces": traces,
+                    "spans": spans,
+                    "total": total,
+                }
+            finally:
+                conn.close()
+
+        except (sqlite3.Error, OSError):
+            # Graceful degradation - return None when database is unavailable
+            # This is acceptable since return type documents None on failure
+            return None
+
+    def get_langfuse_status(self) -> bool:
+        """Check if Langfuse integration is enabled and properly configured.
+
+        Langfuse is considered enabled if ALL conditions are met:
+        1. langfuse_enabled flag is True
+        2. langfuse_public_key is present and non-empty
+        3. langfuse_secret_key is present and non-empty
+
+        Returns:
+            True if Langfuse is enabled and configured, False otherwise
+        """
+        config = self._read_config()
+        if not config:
+            return False
+
+        # Check enabled flag
+        if not config.get("langfuse_enabled", False):
+            return False
+
+        # Check public key
+        public_key = config.get("langfuse_public_key")
+        if not public_key or (isinstance(public_key, str) and not public_key.strip()):
+            return False
+
+        # Check secret key
+        secret_key = config.get("langfuse_secret_key")
+        if not secret_key or (isinstance(secret_key, str) and not secret_key.strip()):
+            return False
+
+        return True
+
+    def _get_clean_code_rules_count(self) -> int:
+        """Get the count of clean code rules from pace-maker.
+
+        Attempts to load clean code rules from pace-maker's clean_code_rules module.
+        If the module cannot be imported or rules cannot be loaded, returns the
+        default count.
+
+        Returns:
+            Number of clean code rules configured, defaults to DEFAULT_CLEAN_CODE_RULES_COUNT
+        """
+        try:
+            import sys
+
+            # Try to find pace-maker source directory
+            pm_src = None
+
+            # Check if install_source file exists
+            install_source_file = self.pm_dir / "install_source"
+            if install_source_file.exists():
+                try:
+                    with open(install_source_file) as f:
+                        source_path = f.read().strip()
+
+                        # Check if this is a pipx installation
+                        if _is_pipx_installation(source_path):
+                            # Find site-packages in pipx venv
+                            site_packages = _find_pipx_site_packages(source_path)
+                            if site_packages:
+                                pm_src = Path(site_packages)
+                        else:
+                            # Regular dev installation - use src directory
+                            pm_src = Path(source_path) / "src"
+                except (OSError, ValueError):
+                    # Failed to read install_source - will try fallback location
+                    pass
+
+            # Fallback: check standard installation location
+            if not pm_src or not pm_src.exists():
+                pm_src = self.pm_dir / "src"
+
+            # Add to path if exists
+            if pm_src and pm_src.exists() and str(pm_src) not in sys.path:
+                sys.path.insert(0, str(pm_src))
+
+            # Import clean_code_rules module and get default rules
+            from pacemaker.clean_code_rules import get_default_rules
+
+            rules = get_default_rules()
+            return len(rules)
+
+        except (ImportError, AttributeError, OSError):
+            # Cannot load pace-maker modules or rules - return default count
+            return DEFAULT_CLEAN_CODE_RULES_COUNT

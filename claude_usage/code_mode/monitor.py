@@ -113,14 +113,21 @@ class CodeMonitor:
         pacemaker_status = None
         weekly_limit_enabled = True  # Default
         blockage_stats = None
+        langfuse_metrics = None
         if self.pacemaker_reader.is_installed():
             pacemaker_status = self.pacemaker_reader.get_status()
             if pacemaker_status:
                 weekly_limit_enabled = pacemaker_status.get(
                     "weekly_limit_enabled", True
                 )
+                # CRITICAL-1c: Inject Langfuse status into pacemaker_status
+                pacemaker_status["langfuse_enabled"] = (
+                    self.pacemaker_reader.get_langfuse_status()
+                )
             # Fetch blockage stats for the two-column bottom section
             blockage_stats = self.pacemaker_reader.get_blockage_stats_with_labels()
+            # CRITICAL-1b: Fetch Langfuse metrics
+            langfuse_metrics = self.pacemaker_reader.get_langfuse_metrics()
 
         main_display = self.renderer.render(
             self.error_message,
@@ -133,8 +140,12 @@ class CodeMonitor:
 
         # Add bottom section with blockage stats if pacemaker is available
         if pacemaker_status and pacemaker_status.get("has_data"):
+            # CRITICAL-1d: Pass langfuse_metrics parameter to render_bottom_section
             bottom_section = self.renderer.render_bottom_section(
-                pacemaker_status, blockage_stats, self.last_update
+                pacemaker_status,
+                blockage_stats,
+                self.last_update,
+                langfuse_metrics=langfuse_metrics,
             )
             return Group(main_display, bottom_section)
 

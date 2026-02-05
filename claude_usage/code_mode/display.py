@@ -426,13 +426,16 @@ class UsageRenderer:
         # Note: Status indicators (Algorithm, Tempo, Subagent, Intent Validation)
         # are now displayed in the two-column bottom section via render_bottom_section()
 
-    def render_bottom_section(self, pacemaker_status, blockage_stats, last_update=None):
+    def render_bottom_section(
+        self, pacemaker_status, blockage_stats, last_update=None, langfuse_metrics=None
+    ):
         """Render two-column bottom section with status and blockage stats.
 
         Args:
             pacemaker_status: Dict with pace-maker status info
             blockage_stats: Dict with human-readable blockage category labels and counts
             last_update: Optional datetime of last data update
+            langfuse_metrics: Optional dict with Langfuse metrics (sessions, traces, spans, total)
 
         Returns:
             Rich renderable Group with two-column layout
@@ -441,7 +444,8 @@ class UsageRenderer:
         status_col_width = 22
         status_separator = "-" * 18
         blockage_separator = "-" * 21  # 1 char longer than "Blockages (last hour)"
-        count_width = 4
+        langfuse_separator = "-" * 21  # Same width as blockage separator
+        count_width = 6
 
         # Create two-column table
         table = Table.grid(padding=(0, 2))
@@ -482,6 +486,34 @@ class UsageRenderer:
         else:
             left_lines.append("Intent Val: [yellow]off[/yellow]")
 
+        # Langfuse status
+        langfuse_enabled = pacemaker_status.get("langfuse_enabled", False)
+        if langfuse_enabled:
+            left_lines.append("Langfuse: [green]on[/green]")
+        else:
+            left_lines.append("Langfuse: [yellow]off[/yellow]")
+
+        # TDD status
+        tdd_enabled = pacemaker_status.get("tdd_enabled", False)
+        if tdd_enabled:
+            left_lines.append("TDD: [green]on[/green]")
+        else:
+            left_lines.append("TDD: [yellow]off[/yellow]")
+
+        # Model preference status
+        preferred_model = pacemaker_status.get("preferred_subagent_model", "auto")
+        if preferred_model == "auto":
+            left_lines.append("Model: [cyan]auto[/cyan]")
+        else:
+            left_lines.append(f"Model: [green]{preferred_model}[/green]")
+
+        # Clean code rules count
+        rules_count = pacemaker_status.get("clean_code_rules_count", 0)
+        if rules_count > 0:
+            left_lines.append(f"Rules: [green]{rules_count}[/green]")
+        else:
+            left_lines.append("Rules: [yellow]0[/yellow]")
+
         # Last update time (no blank line - compact layout)
         if last_update:
             update_str = last_update.strftime("%H:%M:%S")
@@ -489,7 +521,7 @@ class UsageRenderer:
 
         left_content = Text.from_markup("\n".join(left_lines))
 
-        # Build right column - Blockage statistics
+        # Build right column - Blockage statistics and Langfuse metrics
         right_lines = []
         right_lines.append("[bold]Blockages (last hour)[/bold]")
         right_lines.append(blockage_separator)
@@ -501,6 +533,25 @@ class UsageRenderer:
                     right_lines.append(f"{category}:{count:>{count_width}}")
 
             total = blockage_stats.get("Total", 0)
+            right_lines.append(f"[bold]Total:{total:>{count_width}}[/bold]")
+        else:
+            right_lines.append("(unavailable)")
+
+        # Add Langfuse metrics section
+        right_lines.append("")  # Blank line separator
+        right_lines.append("[bold]Langfuse (last 24hrs)[/bold]")
+        right_lines.append(langfuse_separator)
+
+        if langfuse_metrics is not None:
+            # Display metrics with alignment
+            sessions = langfuse_metrics.get("sessions", 0)
+            traces = langfuse_metrics.get("traces", 0)
+            spans = langfuse_metrics.get("spans", 0)
+            total = langfuse_metrics.get("total", 0)
+
+            right_lines.append(f"Sessions:{sessions:>{count_width}}")
+            right_lines.append(f"Traces:{traces:>{count_width}}")
+            right_lines.append(f"Spans:{spans:>{count_width}}")
             right_lines.append(f"[bold]Total:{total:>{count_width}}[/bold]")
         else:
             right_lines.append("(unavailable)")

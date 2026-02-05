@@ -31,7 +31,9 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
             "claudeAiOauth": {
                 "accessToken": "valid-access-token",
                 "refreshToken": "valid-refresh-token",
-                "expiresAt": int(current_time + (4 * 60 * 60 * 1000))  # 4 hours from now
+                "expiresAt": int(
+                    current_time + (4 * 60 * 60 * 1000)
+                ),  # 4 hours from now
             }
         }
 
@@ -40,7 +42,9 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
             "claudeAiOauth": {
                 "accessToken": "expired-access-token",
                 "refreshToken": "expired-refresh-token",
-                "expiresAt": int(current_time - (2 * 24 * 60 * 60 * 1000))  # 2 days ago
+                "expiresAt": int(
+                    current_time - (2 * 24 * 60 * 60 * 1000)
+                ),  # 2 days ago
             }
         }
 
@@ -49,7 +53,9 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
             "claudeAiOauth": {
                 "accessToken": "fresh-keychain-token",
                 "refreshToken": "fresh-keychain-refresh",
-                "expiresAt": int(current_time + (5 * 60 * 60 * 1000))  # 5 hours from now
+                "expiresAt": int(
+                    current_time + (5 * 60 * 60 * 1000)
+                ),  # 5 hours from now
             }
         }
 
@@ -58,24 +64,29 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
             "usage": {
                 "daily_limit": 1000,
                 "daily_used": 500,
-                "reset_at": int(current_time + (3 * 60 * 60 * 1000))
+                "reset_at": int(current_time + (3 * 60 * 60 * 1000)),
             }
         }
 
     def tearDown(self):
         """Clean up test fixtures"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('platform.system', return_value='Darwin')
-    def test_fetch_usage_with_expired_token_reloads_from_file_valid_token(self, mock_platform):
+    @patch("platform.system", return_value="Darwin")
+    def test_fetch_usage_with_expired_token_reloads_from_file_valid_token(
+        self, mock_platform
+    ):
         """Test that expired token triggers reload from file with valid token"""
         # Write expired token to file initially
         with open(self.credentials_path, "w") as f:
             json.dump(self.expired_token_data, f)
 
         # Mock Keychain during init to prevent it from loading real credentials
-        with patch('claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain') as mock_keychain_init:
+        with patch(
+            "claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain"
+        ) as mock_keychain_init:
             mock_keychain_init.return_value = (None, "Not found")
             monitor = CodeMonitor(credentials_path=self.credentials_path)
 
@@ -88,11 +99,13 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
             json.dump(self.valid_token_data, f)
 
         # Mock API client to succeed with fresh token
-        with patch.object(monitor.api_client, 'fetch_usage') as mock_fetch:
+        with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
             mock_fetch.return_value = (self.mock_usage_response, None)
 
             # Mock Keychain to ensure it's not called (file has valid token)
-            with patch.object(monitor.oauth_manager, 'extract_from_macos_keychain') as mock_keychain:
+            with patch.object(
+                monitor.oauth_manager, "extract_from_macos_keychain"
+            ) as mock_keychain:
                 success = monitor.fetch_usage()
 
             mock_keychain.assert_not_called()
@@ -103,7 +116,7 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.assertEqual(monitor.credentials["accessToken"], "valid-access-token")
         self.assertIsNotNone(monitor.last_usage)
 
-    @patch('platform.system', return_value='Darwin')
+    @patch("platform.system", return_value="Darwin")
     def test_fetch_usage_with_expired_token_reloads_from_keychain(self, mock_platform):
         """Test that expired token triggers reload from Keychain when file also expired"""
         # Write expired token to file
@@ -111,7 +124,9 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
             json.dump(self.expired_token_data, f)
 
         # Mock Keychain during init
-        with patch('claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain') as mock_keychain_init:
+        with patch(
+            "claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain"
+        ) as mock_keychain_init:
             mock_keychain_init.return_value = (None, "Not found")
             monitor = CodeMonitor(credentials_path=self.credentials_path)
 
@@ -120,11 +135,13 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.assertEqual(monitor.credentials["accessToken"], "expired-access-token")
 
         # Mock Keychain to return fresh token
-        with patch.object(monitor.oauth_manager, 'extract_from_macos_keychain') as mock_keychain:
+        with patch.object(
+            monitor.oauth_manager, "extract_from_macos_keychain"
+        ) as mock_keychain:
             mock_keychain.return_value = (self.fresh_keychain_data, None)
 
             # Mock API client to succeed with fresh token
-            with patch.object(monitor.api_client, 'fetch_usage') as mock_fetch:
+            with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
                 mock_fetch.return_value = (self.mock_usage_response, None)
 
                 success = monitor.fetch_usage()
@@ -138,24 +155,33 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.assertEqual(monitor.credentials["accessToken"], "fresh-keychain-token")
         self.assertIsNotNone(monitor.last_usage)
 
-    @patch('platform.system', return_value='Darwin')
-    def test_fetch_usage_with_expired_token_keychain_fails_shows_error(self, mock_platform):
+    @patch("platform.system", return_value="Darwin")
+    def test_fetch_usage_with_expired_token_keychain_fails_shows_error(
+        self, mock_platform
+    ):
         """Test that expired token with failed Keychain extraction shows error"""
         # Write expired token to file
         with open(self.credentials_path, "w") as f:
             json.dump(self.expired_token_data, f)
 
         # Mock Keychain during init
-        with patch('claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain') as mock_keychain_init:
+        with patch(
+            "claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain"
+        ) as mock_keychain_init:
             mock_keychain_init.return_value = (None, "Not found")
             monitor = CodeMonitor(credentials_path=self.credentials_path)
 
         # Mock Keychain to fail
-        with patch.object(monitor.oauth_manager, 'extract_from_macos_keychain') as mock_keychain:
-            mock_keychain.return_value = (None, "Failed to extract from Keychain: security error")
+        with patch.object(
+            monitor.oauth_manager, "extract_from_macos_keychain"
+        ) as mock_keychain:
+            mock_keychain.return_value = (
+                None,
+                "Failed to extract from Keychain: security error",
+            )
 
             # Mock API client (should not be called)
-            with patch.object(monitor.api_client, 'fetch_usage') as mock_fetch:
+            with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
                 success = monitor.fetch_usage()
 
             mock_fetch.assert_not_called()
@@ -165,7 +191,7 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.assertIsNotNone(monitor.error_message)
         self.assertIn("expired", monitor.error_message.lower())
 
-    @patch('platform.system', return_value='Linux')
+    @patch("platform.system", return_value="Linux")
     def test_fetch_usage_with_expired_token_on_linux_shows_error(self, mock_platform):
         """Test that expired token on Linux shows error (no Keychain available)"""
         # Write expired token to file
@@ -176,7 +202,7 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         monitor = CodeMonitor(credentials_path=self.credentials_path)
 
         # Mock API client (should not be called)
-        with patch.object(monitor.api_client, 'fetch_usage') as mock_fetch:
+        with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
             success = monitor.fetch_usage()
 
         mock_fetch.assert_not_called()
@@ -186,8 +212,10 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.assertIsNotNone(monitor.error_message)
         self.assertIn("expired", monitor.error_message.lower())
 
-    @patch('claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain')
-    def test_fetch_usage_with_valid_token_succeeds_without_reload(self, mock_keychain_init):
+    @patch("claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain")
+    def test_fetch_usage_with_valid_token_succeeds_without_reload(
+        self, mock_keychain_init
+    ):
         """Test that valid token proceeds directly to API call without reload"""
         # Write valid token to file
         with open(self.credentials_path, "w") as f:
@@ -208,7 +236,7 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         monitor._load_credentials = tracked_load
 
         # Mock API client to succeed
-        with patch.object(monitor.api_client, 'fetch_usage') as mock_fetch:
+        with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
             mock_fetch.return_value = (self.mock_usage_response, None)
 
             success = monitor.fetch_usage()
@@ -221,15 +249,19 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         # Only initial load in __init__, no reload during fetch_usage
         self.assertEqual(load_call_count[0], 0)
 
-    @patch('platform.system', return_value='Darwin')
-    def test_fetch_usage_updates_credentials_in_memory_after_reload(self, mock_platform):
+    @patch("platform.system", return_value="Darwin")
+    def test_fetch_usage_updates_credentials_in_memory_after_reload(
+        self, mock_platform
+    ):
         """Test that credentials object in monitor is updated after successful reload"""
         # Write expired token to file
         with open(self.credentials_path, "w") as f:
             json.dump(self.expired_token_data, f)
 
         # Mock Keychain during init
-        with patch('claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain') as mock_keychain_init:
+        with patch(
+            "claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain"
+        ) as mock_keychain_init:
             mock_keychain_init.return_value = (None, "Not found")
             monitor = CodeMonitor(credentials_path=self.credentials_path)
 
@@ -238,11 +270,13 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.assertEqual(initial_token, "expired-access-token")
 
         # Mock Keychain to return fresh token
-        with patch.object(monitor.oauth_manager, 'extract_from_macos_keychain') as mock_keychain:
+        with patch.object(
+            monitor.oauth_manager, "extract_from_macos_keychain"
+        ) as mock_keychain:
             mock_keychain.return_value = (self.fresh_keychain_data, None)
 
             # Mock API client
-            with patch.object(monitor.api_client, 'fetch_usage') as mock_fetch:
+            with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
                 mock_fetch.return_value = (self.mock_usage_response, None)
 
                 monitor.fetch_usage()
@@ -251,7 +285,7 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.assertEqual(monitor.credentials["accessToken"], "fresh-keychain-token")
         self.assertNotEqual(monitor.credentials["accessToken"], initial_token)
 
-    @patch('platform.system', return_value='Darwin')
+    @patch("platform.system", return_value="Darwin")
     def test_fetch_usage_saves_reloaded_token_to_file(self, mock_platform):
         """Test that successfully reloaded token from Keychain is saved to file"""
         # Write expired token to file
@@ -259,16 +293,20 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
             json.dump(self.expired_token_data, f)
 
         # Mock Keychain during init
-        with patch('claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain') as mock_keychain_init:
+        with patch(
+            "claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain"
+        ) as mock_keychain_init:
             mock_keychain_init.return_value = (None, "Not found")
             monitor = CodeMonitor(credentials_path=self.credentials_path)
 
         # Mock Keychain to return fresh token
-        with patch.object(monitor.oauth_manager, 'extract_from_macos_keychain') as mock_keychain:
+        with patch.object(
+            monitor.oauth_manager, "extract_from_macos_keychain"
+        ) as mock_keychain:
             mock_keychain.return_value = (self.fresh_keychain_data, None)
 
             # Mock API client
-            with patch.object(monitor.api_client, 'fetch_usage') as mock_fetch:
+            with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
                 mock_fetch.return_value = (self.mock_usage_response, None)
 
                 monitor.fetch_usage()
@@ -277,10 +315,14 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         with open(self.credentials_path) as f:
             saved_data = json.load(f)
 
-        self.assertEqual(saved_data["claudeAiOauth"]["accessToken"], "fresh-keychain-token")
+        self.assertEqual(
+            saved_data["claudeAiOauth"]["accessToken"], "fresh-keychain-token"
+        )
 
-    @patch('claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain')
-    def test_fetch_usage_with_no_credentials_loads_on_first_call(self, mock_keychain_init):
+    @patch("claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain")
+    def test_fetch_usage_with_no_credentials_loads_on_first_call(
+        self, mock_keychain_init
+    ):
         """Test that missing credentials trigger load on first fetch_usage call"""
         # Don't create credentials file initially
         # Mock Keychain during init to return no credentials
@@ -296,7 +338,7 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
             json.dump(self.valid_token_data, f)
 
         # Mock API client
-        with patch.object(monitor.api_client, 'fetch_usage') as mock_fetch:
+        with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
             mock_fetch.return_value = (self.mock_usage_response, None)
 
             success = monitor.fetch_usage()
@@ -306,24 +348,30 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.assertIsNone(monitor.error_message)
         self.assertEqual(monitor.credentials["accessToken"], "valid-access-token")
 
-    @patch('platform.system', return_value='Darwin')
-    def test_multiple_fetch_usage_calls_only_reload_once_for_expired_token(self, mock_platform):
+    @patch("platform.system", return_value="Darwin")
+    def test_multiple_fetch_usage_calls_only_reload_once_for_expired_token(
+        self, mock_platform
+    ):
         """Test that multiple fetch_usage calls with expired token only reload once"""
         # Write expired token to file
         with open(self.credentials_path, "w") as f:
             json.dump(self.expired_token_data, f)
 
         # Mock Keychain during init
-        with patch('claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain') as mock_keychain_init:
+        with patch(
+            "claude_usage.code_mode.auth.OAuthManager.extract_from_macos_keychain"
+        ) as mock_keychain_init:
             mock_keychain_init.return_value = (None, "Not found")
             monitor = CodeMonitor(credentials_path=self.credentials_path)
 
         # Mock Keychain to return fresh token
-        with patch.object(monitor.oauth_manager, 'extract_from_macos_keychain') as mock_keychain:
+        with patch.object(
+            monitor.oauth_manager, "extract_from_macos_keychain"
+        ) as mock_keychain:
             mock_keychain.return_value = (self.fresh_keychain_data, None)
 
             # Mock API client
-            with patch.object(monitor.api_client, 'fetch_usage') as mock_fetch:
+            with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
                 mock_fetch.return_value = (self.mock_usage_response, None)
 
                 # First call - should reload from Keychain

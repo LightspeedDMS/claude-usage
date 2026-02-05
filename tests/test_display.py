@@ -114,7 +114,9 @@ class TestUsageRenderer(unittest.TestCase):
 
         for utilization, expected_style in test_cases:
             with self.subTest(utilization=utilization):
-                with patch("claude_usage.code_mode.display.Progress") as mock_progress_class:
+                with patch(
+                    "claude_usage.code_mode.display.Progress"
+                ) as mock_progress_class:
                     mock_progress = MagicMock()
                     mock_progress_class.return_value = mock_progress
                     mock_progress.add_task.return_value = 1
@@ -159,7 +161,8 @@ class TestUsageRenderer(unittest.TestCase):
         self.renderer._render_five_hour_limit(content, five_hour_data)
 
         # Verify a Progress object was added to content
-        self.assertEqual(len(content), 2)  # Progress bar + reset time text
+        # Content now has: Progress bar + limiter status text + reset time text
+        self.assertEqual(len(content), 3)
 
         # First item should be a Progress instance
         from rich.progress import Progress

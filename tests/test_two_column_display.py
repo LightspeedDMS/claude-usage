@@ -100,7 +100,9 @@ class TestBlockageStatsUnavailable(unittest.TestCase):
     def test_render_bottom_section_shows_unavailable_when_stats_none(self):
         """Test that right column shows '(unavailable)' when blockage_stats is None (AC5)"""
         pacemaker_status = {"enabled": True, "has_data": True, "algorithm": "adaptive"}
-        result = self.renderer.render_bottom_section(pacemaker_status, blockage_stats=None)
+        result = self.renderer.render_bottom_section(
+            pacemaker_status, blockage_stats=None
+        )
         output = self._render_to_text(result)
         self.assertIn("unavailable", output)
         # Left column should still work
@@ -154,13 +156,9 @@ class TestMonitorIntegration(unittest.TestCase):
     def test_get_display_includes_bottom_section_with_blockage_stats(self):
         """Test that get_display output includes bottom section with blockage stats (Issue 2)"""
         # Create monitor with mocked dependencies
-        with patch(
-            "claude_usage.code_mode.monitor.OAuthManager"
-        ) as mock_oauth, patch(
+        with patch("claude_usage.code_mode.monitor.OAuthManager") as mock_oauth, patch(
             "claude_usage.code_mode.monitor.ClaudeAPIClient"
-        ), patch(
-            "claude_usage.code_mode.monitor.CodeStorage"
-        ), patch(
+        ), patch("claude_usage.code_mode.monitor.CodeStorage"), patch(
             "claude_usage.code_mode.monitor.CodeAnalytics"
         ), patch(
             "claude_usage.code_mode.monitor.PaceMakerReader"
@@ -177,6 +175,9 @@ class TestMonitorIntegration(unittest.TestCase):
                 "tempo_enabled": True,
                 "intent_validation_enabled": False,
                 "subagent_reminder_enabled": True,
+                "tdd_enabled": True,
+                "preferred_subagent_model": "auto",
+                "clean_code_rules_count": 17,
                 "five_hour": {"utilization": 50.0, "target": 60.0},
                 "seven_day": {"utilization": 45.0, "target": 50.0},
                 "constrained_window": "7-day",
@@ -191,13 +192,26 @@ class TestMonitorIntegration(unittest.TestCase):
                 "Other": 0,
                 "Total": 10,
             }
+            mock_pacemaker.get_langfuse_status.return_value = True
+            mock_pacemaker.get_langfuse_metrics.return_value = {
+                "sessions": 10,
+                "traces": 25,
+                "spans": 100,
+                "total": 135,
+            }
 
             monitor = CodeMonitor()
 
             # Provide usage data
             monitor.last_usage = {
-                "five_hour": {"utilization": 50.0, "resets_at": "2024-01-15T10:00:00+00:00"},
-                "seven_day": {"utilization": 45.0, "resets_at": "2024-01-20T10:00:00+00:00"},
+                "five_hour": {
+                    "utilization": 50.0,
+                    "resets_at": "2024-01-15T10:00:00+00:00",
+                },
+                "seven_day": {
+                    "utilization": 45.0,
+                    "resets_at": "2024-01-20T10:00:00+00:00",
+                },
             }
             monitor.last_profile = None
             monitor.error_message = None
@@ -207,19 +221,19 @@ class TestMonitorIntegration(unittest.TestCase):
             output = self._render_to_text(display)
 
             # Verify blockage stats are included in the output
-            self.assertIn("Blockages", output, "Bottom section with blockages should be included")
-            self.assertIn("Intent Validation", output, "Blockage stats should show categories")
+            self.assertIn(
+                "Blockages", output, "Bottom section with blockages should be included"
+            )
+            self.assertIn(
+                "Intent Validation", output, "Blockage stats should show categories"
+            )
 
     def test_get_display_gracefully_degrades_without_blockage_stats(self):
         """Test that get_display works when blockage stats are unavailable"""
         # Create monitor with mocked dependencies
-        with patch(
-            "claude_usage.code_mode.monitor.OAuthManager"
-        ) as mock_oauth, patch(
+        with patch("claude_usage.code_mode.monitor.OAuthManager") as mock_oauth, patch(
             "claude_usage.code_mode.monitor.ClaudeAPIClient"
-        ), patch(
-            "claude_usage.code_mode.monitor.CodeStorage"
-        ), patch(
+        ), patch("claude_usage.code_mode.monitor.CodeStorage"), patch(
             "claude_usage.code_mode.monitor.CodeAnalytics"
         ), patch(
             "claude_usage.code_mode.monitor.PaceMakerReader"
@@ -233,6 +247,9 @@ class TestMonitorIntegration(unittest.TestCase):
                 "enabled": True,
                 "has_data": True,
                 "algorithm": "adaptive",
+                "tdd_enabled": True,
+                "preferred_subagent_model": "auto",
+                "clean_code_rules_count": 17,
                 "five_hour": {"utilization": 50.0, "target": 60.0},
                 "seven_day": {"utilization": 45.0, "target": 50.0},
                 "constrained_window": "7-day",
@@ -241,11 +258,19 @@ class TestMonitorIntegration(unittest.TestCase):
             }
             # Blockage stats unavailable
             mock_pacemaker.get_blockage_stats_with_labels.return_value = None
+            mock_pacemaker.get_langfuse_status.return_value = False
+            mock_pacemaker.get_langfuse_metrics.return_value = None
 
             monitor = CodeMonitor()
             monitor.last_usage = {
-                "five_hour": {"utilization": 50.0, "resets_at": "2024-01-15T10:00:00+00:00"},
-                "seven_day": {"utilization": 45.0, "resets_at": "2024-01-20T10:00:00+00:00"},
+                "five_hour": {
+                    "utilization": 50.0,
+                    "resets_at": "2024-01-15T10:00:00+00:00",
+                },
+                "seven_day": {
+                    "utilization": 45.0,
+                    "resets_at": "2024-01-20T10:00:00+00:00",
+                },
             }
             monitor.last_profile = None
             monitor.error_message = None

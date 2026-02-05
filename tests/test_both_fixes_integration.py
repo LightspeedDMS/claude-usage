@@ -88,7 +88,7 @@ class TestBothFixesIntegration(unittest.TestCase):
 
         self.assertTrue(
             has_negative_deviation,
-            f"Deviation should be negative (around -4.5%). Got output: {output}"
+            f"Deviation should be negative (around -4.5%). Got output: {output}",
         )
 
         self.assertIn("under budget", output.lower())
@@ -150,7 +150,7 @@ class TestBothFixesIntegration(unittest.TestCase):
 
         self.assertTrue(
             has_positive_deviation,
-            f"Deviation should be positive (around +1.5%). Got output: {output}"
+            f"Deviation should be positive (around +1.5%). Got output: {output}",
         )
 
         self.assertIn("over budget", output.lower())
@@ -214,7 +214,7 @@ class TestBothFixesIntegration(unittest.TestCase):
 
         self.assertTrue(
             has_negative_deviation,
-            f"Deviation should reflect fresh utilization (12%). Got output: {output}"
+            f"Deviation should reflect fresh utilization (12%). Got output: {output}",
         )
 
 

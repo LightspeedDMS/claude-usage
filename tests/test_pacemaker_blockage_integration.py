@@ -32,13 +32,15 @@ class TestBlockageStatsRetrieval(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary files"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _initialize_test_database(self):
         """Initialize test database with blockage_events table"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS blockage_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp INTEGER NOT NULL,
@@ -47,13 +49,15 @@ class TestBlockageStatsRetrieval(unittest.TestCase):
                 hook_type TEXT NOT NULL,
                 session_id TEXT NOT NULL
             )
-        """)
+        """
+        )
         conn.commit()
         conn.close()
 
     def _create_config(self):
         """Create minimal config file"""
         import json
+
         with open(self.config_path, "w") as f:
             json.dump({"enabled": True}, f)
 
@@ -74,7 +78,13 @@ class TestBlockageStatsRetrieval(unittest.TestCase):
         """Test that get_blockage_stats returns dict with all blockage categories"""
         result = self.reader.get_blockage_stats()
         self.assertIsInstance(result, dict)
-        expected = ["intent_validation", "intent_validation_tdd", "pacing_tempo", "pacing_quota", "other"]
+        expected = [
+            "intent_validation",
+            "intent_validation_tdd",
+            "pacing_tempo",
+            "pacing_quota",
+            "other",
+        ]
         for category in expected:
             self.assertIn(category, result)
 
@@ -113,13 +123,15 @@ class TestBlockageStatsTotal(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary files"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _initialize_test_database(self):
         """Initialize test database with blockage_events table"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS blockage_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp INTEGER NOT NULL,
@@ -128,13 +140,15 @@ class TestBlockageStatsTotal(unittest.TestCase):
                 hook_type TEXT NOT NULL,
                 session_id TEXT NOT NULL
             )
-        """)
+        """
+        )
         conn.commit()
         conn.close()
 
     def _create_config(self):
         """Create minimal config file"""
         import json
+
         with open(self.config_path, "w") as f:
             json.dump({"enabled": True}, f)
 
@@ -177,6 +191,7 @@ class TestBlockageStatsGracefulDegradation(unittest.TestCase):
         """Test that None is returned when database file doesn't exist"""
         import json
         import shutil
+
         temp_dir = tempfile.mkdtemp()
         try:
             config_path = os.path.join(temp_dir, "config.json")
@@ -195,6 +210,7 @@ class TestBlockageStatsGracefulDegradation(unittest.TestCase):
         """Test that None is returned when database query fails"""
         import json
         import shutil
+
         temp_dir = tempfile.mkdtemp()
         try:
             config_path = os.path.join(temp_dir, "config.json")
@@ -231,13 +247,15 @@ class TestBlockageStatsHumanReadableLabels(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary files"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _initialize_test_database(self):
         """Initialize test database with blockage_events table"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS blockage_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp INTEGER NOT NULL,
@@ -246,13 +264,15 @@ class TestBlockageStatsHumanReadableLabels(unittest.TestCase):
                 hook_type TEXT NOT NULL,
                 session_id TEXT NOT NULL
             )
-        """)
+        """
+        )
         conn.commit()
         conn.close()
 
     def _create_config(self):
         """Create minimal config file"""
         import json
+
         with open(self.config_path, "w") as f:
             json.dump({"enabled": True}, f)
 
@@ -273,7 +293,15 @@ class TestBlockageStatsHumanReadableLabels(unittest.TestCase):
         """Test that get_blockage_stats_with_labels returns human-readable keys"""
         self._insert_blockage_event("intent_validation", minutes_ago=5)
         result = self.reader.get_blockage_stats_with_labels()
-        expected_labels = ["Intent Validation", "Intent TDD", "Pacing Tempo", "Pacing Quota", "Other", "Total"]
+        # Note: 'Other' is excluded from labels as it's a rarely-used catch-all category
+        expected_labels = [
+            "Intent Validation",
+            "Intent TDD",
+            "Clean Code",
+            "Pacing Tempo",
+            "Pacing Quota",
+            "Total",
+        ]
         for label in expected_labels:
             self.assertIn(label, result)
         self.assertEqual(result["Intent Validation"], 1)
@@ -297,13 +325,15 @@ class TestBlockageStatsCaching(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary files"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _initialize_test_database(self):
         """Initialize test database with blockage_events table"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS blockage_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp INTEGER NOT NULL,
@@ -312,13 +342,15 @@ class TestBlockageStatsCaching(unittest.TestCase):
                 hook_type TEXT NOT NULL,
                 session_id TEXT NOT NULL
             )
-        """)
+        """
+        )
         conn.commit()
         conn.close()
 
     def _create_config(self):
         """Create minimal config file"""
         import json
+
         with open(self.config_path, "w") as f:
             json.dump({"enabled": True}, f)
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-usage"
-version = "1.1.0"
+version = "1.2.0"
 description = "Live-updating terminal dashboard for monitoring Claude Code account usage"
 readme = "README.md"
 requires-python = ">=3.6"

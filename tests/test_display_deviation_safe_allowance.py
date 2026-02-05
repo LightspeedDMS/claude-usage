@@ -94,14 +94,14 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
 
         self.assertTrue(
             has_positive_deviation,
-            f"Deviation should be positive when throttling. Got: {output}"
+            f"Deviation should be positive when throttling. Got: {output}",
         )
 
         # Should NOT show "under budget" when throttling
         self.assertNotIn(
             "under budget",
             output.lower(),
-            "Should not show 'under budget' when throttling is active"
+            "Should not show 'under budget' when throttling is active",
         )
 
     def test_deviation_negative_when_not_throttling(self):
@@ -155,14 +155,14 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
 
         self.assertTrue(
             has_negative_deviation,
-            f"Deviation should be negative when not throttling. Got: {output}"
+            f"Deviation should be negative when not throttling. Got: {output}",
         )
 
         # Should show "under budget" when not throttling
         self.assertIn(
             "under budget",
             output.lower(),
-            "Should show 'under budget' when not throttling"
+            "Should show 'under budget' when not throttling",
         )
 
     def test_deviation_uses_fresh_utilization_not_stale(self):
@@ -217,7 +217,7 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
 
         self.assertTrue(
             has_positive_deviation,
-            f"Deviation should reflect fresh utilization (92%), not stale (90%). Got: {output}"
+            f"Deviation should reflect fresh utilization (92%), not stale (90%). Got: {output}",
         )
 
     def test_deviation_color_coding_matches_throttling(self):

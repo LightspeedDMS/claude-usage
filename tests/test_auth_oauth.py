@@ -26,7 +26,9 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
             "claudeAiOauth": {
                 "accessToken": "valid-access-token",
                 "refreshToken": "valid-refresh-token",
-                "expiresAt": int(current_time + (4 * 60 * 60 * 1000))  # 4 hours from now
+                "expiresAt": int(
+                    current_time + (4 * 60 * 60 * 1000)
+                ),  # 4 hours from now
             }
         }
 
@@ -35,7 +37,9 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
             "claudeAiOauth": {
                 "accessToken": "expired-access-token",
                 "refreshToken": "expired-refresh-token",
-                "expiresAt": int(current_time - (2 * 24 * 60 * 60 * 1000))  # 2 days ago
+                "expiresAt": int(
+                    current_time - (2 * 24 * 60 * 60 * 1000)
+                ),  # 2 days ago
             }
         }
 
@@ -44,13 +48,16 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
             "claudeAiOauth": {
                 "accessToken": "fresh-keychain-token",
                 "refreshToken": "fresh-keychain-refresh",
-                "expiresAt": int(current_time + (5 * 60 * 60 * 1000))  # 5 hours from now
+                "expiresAt": int(
+                    current_time + (5 * 60 * 60 * 1000)
+                ),  # 5 hours from now
             }
         }
 
     def tearDown(self):
         """Clean up test fixtures"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_file_exists_with_valid_token_returns_file_token(self):
@@ -62,7 +69,7 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         manager = OAuthManager(self.credentials_path)
 
         # Mock Keychain to ensure it's not called
-        with patch.object(manager, 'extract_from_macos_keychain') as mock_keychain:
+        with patch.object(manager, "extract_from_macos_keychain") as mock_keychain:
             credentials, error = manager.load_credentials()
 
         # Should return file token without calling Keychain
@@ -71,8 +78,10 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         self.assertEqual(credentials["accessToken"], "valid-access-token")
         mock_keychain.assert_not_called()
 
-    @patch('platform.system', return_value='Darwin')
-    def test_file_exists_with_expired_token_on_macos_extracts_from_keychain(self, mock_platform):
+    @patch("platform.system", return_value="Darwin")
+    def test_file_exists_with_expired_token_on_macos_extracts_from_keychain(
+        self, mock_platform
+    ):
         """Test that expired token on macOS triggers Keychain extraction"""
         # Write expired token to file
         with open(self.credentials_path, "w") as f:
@@ -81,7 +90,11 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         manager = OAuthManager(self.credentials_path)
 
         # Mock Keychain to return fresh token
-        with patch.object(manager, 'extract_from_macos_keychain', return_value=(self.fresh_keychain_data, None)):
+        with patch.object(
+            manager,
+            "extract_from_macos_keychain",
+            return_value=(self.fresh_keychain_data, None),
+        ):
             credentials, error = manager.load_credentials()
 
         # Should return fresh Keychain token
@@ -92,10 +105,14 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         # Verify fresh token was saved to file
         with open(self.credentials_path) as f:
             saved_data = json.load(f)
-        self.assertEqual(saved_data["claudeAiOauth"]["accessToken"], "fresh-keychain-token")
+        self.assertEqual(
+            saved_data["claudeAiOauth"]["accessToken"], "fresh-keychain-token"
+        )
 
-    @patch('platform.system', return_value='Darwin')
-    def test_file_exists_with_expired_token_keychain_fails_returns_expired_with_error(self, mock_platform):
+    @patch("platform.system", return_value="Darwin")
+    def test_file_exists_with_expired_token_keychain_fails_returns_expired_with_error(
+        self, mock_platform
+    ):
         """Test that expired token with failed Keychain extraction returns expired token with error"""
         # Write expired token to file
         with open(self.credentials_path, "w") as f:
@@ -105,7 +122,9 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
 
         # Mock Keychain to fail
         keychain_error = "Failed to extract from Keychain: security: SecKeychainSearchCopyNext: The specified item could not be found in the keychain."
-        with patch.object(manager, 'extract_from_macos_keychain', return_value=(None, keychain_error)):
+        with patch.object(
+            manager, "extract_from_macos_keychain", return_value=(None, keychain_error)
+        ):
             credentials, error = manager.load_credentials()
 
         # Should return expired token with expiry error
@@ -114,8 +133,10 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         self.assertEqual(credentials["accessToken"], "expired-access-token")
         self.assertIn("expired", error.lower())
 
-    @patch('platform.system', return_value='Linux')
-    def test_file_exists_with_expired_token_on_linux_returns_expired_with_error(self, mock_platform):
+    @patch("platform.system", return_value="Linux")
+    def test_file_exists_with_expired_token_on_linux_returns_expired_with_error(
+        self, mock_platform
+    ):
         """Test that expired token on Linux returns expired token with error (no Keychain)"""
         # Write expired token to file
         with open(self.credentials_path, "w") as f:
@@ -124,7 +145,7 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         manager = OAuthManager(self.credentials_path)
 
         # Mock Keychain to ensure it's not called (Linux doesn't have macOS Keychain)
-        with patch.object(manager, 'extract_from_macos_keychain') as mock_keychain:
+        with patch.object(manager, "extract_from_macos_keychain") as mock_keychain:
             credentials, error = manager.load_credentials()
 
         # Should return expired token with error
@@ -134,13 +155,17 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         self.assertIn("expired", error.lower())
         mock_keychain.assert_not_called()
 
-    @patch('platform.system', return_value='Darwin')
+    @patch("platform.system", return_value="Darwin")
     def test_file_not_exists_on_macos_extracts_from_keychain(self, mock_platform):
         """Test existing behavior: file doesn't exist on macOS extracts from Keychain"""
         manager = OAuthManager(self.credentials_path)
 
         # Mock Keychain to return fresh token
-        with patch.object(manager, 'extract_from_macos_keychain', return_value=(self.fresh_keychain_data, None)):
+        with patch.object(
+            manager,
+            "extract_from_macos_keychain",
+            return_value=(self.fresh_keychain_data, None),
+        ):
             credentials, error = manager.load_credentials()
 
         # Should return Keychain token
@@ -152,9 +177,11 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         self.assertTrue(self.credentials_path.exists())
         with open(self.credentials_path) as f:
             saved_data = json.load(f)
-        self.assertEqual(saved_data["claudeAiOauth"]["accessToken"], "fresh-keychain-token")
+        self.assertEqual(
+            saved_data["claudeAiOauth"]["accessToken"], "fresh-keychain-token"
+        )
 
-    @patch('platform.system', return_value='Linux')
+    @patch("platform.system", return_value="Linux")
     def test_file_not_exists_on_linux_returns_error(self, mock_platform):
         """Test existing behavior: file doesn't exist on Linux returns error"""
         manager = OAuthManager(self.credentials_path)
@@ -166,7 +193,7 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         self.assertIsNotNone(error)
         self.assertIn("not found", error.lower())
 
-    @patch('platform.system', return_value='Darwin')
+    @patch("platform.system", return_value="Darwin")
     def test_expired_token_keychain_extraction_saves_to_file(self, mock_platform):
         """Test that successful Keychain extraction for expired token saves to file"""
         # Write expired token to file
@@ -176,18 +203,29 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         manager = OAuthManager(self.credentials_path)
 
         # Mock Keychain to return fresh token
-        with patch.object(manager, 'extract_from_macos_keychain', return_value=(self.fresh_keychain_data, None)):
+        with patch.object(
+            manager,
+            "extract_from_macos_keychain",
+            return_value=(self.fresh_keychain_data, None),
+        ):
             credentials, error = manager.load_credentials()
 
         # Verify file was updated with fresh token
         with open(self.credentials_path) as f:
             saved_data = json.load(f)
 
-        self.assertEqual(saved_data["claudeAiOauth"]["accessToken"], "fresh-keychain-token")
-        self.assertEqual(saved_data["claudeAiOauth"]["expiresAt"], self.fresh_keychain_data["claudeAiOauth"]["expiresAt"])
+        self.assertEqual(
+            saved_data["claudeAiOauth"]["accessToken"], "fresh-keychain-token"
+        )
+        self.assertEqual(
+            saved_data["claudeAiOauth"]["expiresAt"],
+            self.fresh_keychain_data["claudeAiOauth"]["expiresAt"],
+        )
 
-    @patch('platform.system', return_value='Darwin')
-    def test_expired_token_keychain_save_fails_returns_fresh_token_anyway(self, mock_platform):
+    @patch("platform.system", return_value="Darwin")
+    def test_expired_token_keychain_save_fails_returns_fresh_token_anyway(
+        self, mock_platform
+    ):
         """Test that Keychain token is returned even if file save fails"""
         # Write expired token to file
         with open(self.credentials_path, "w") as f:
@@ -196,9 +234,17 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         manager = OAuthManager(self.credentials_path)
 
         # Mock Keychain to return fresh token
-        with patch.object(manager, 'extract_from_macos_keychain', return_value=(self.fresh_keychain_data, None)):
+        with patch.object(
+            manager,
+            "extract_from_macos_keychain",
+            return_value=(self.fresh_keychain_data, None),
+        ):
             # Mock save to fail
-            with patch.object(manager, 'save_credentials_file', return_value=(False, "Permission denied")):
+            with patch.object(
+                manager,
+                "save_credentials_file",
+                return_value=(False, "Permission denied"),
+            ):
                 credentials, error = manager.load_credentials()
 
         # Should still return fresh Keychain token even though save failed
@@ -215,7 +261,7 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         # Token expiring in 4 minutes
         almost_expired_creds = {
             "accessToken": "almost-expired-token",
-            "expiresAt": int(current_time + (4 * 60 * 1000))  # 4 minutes from now
+            "expiresAt": int(current_time + (4 * 60 * 1000)),  # 4 minutes from now
         }
 
         self.assertTrue(manager.is_token_expired(almost_expired_creds))
@@ -229,7 +275,7 @@ class TestOAuthManagerTokenExpiry(unittest.TestCase):
         # Token expiring in 6 minutes
         valid_creds = {
             "accessToken": "valid-token",
-            "expiresAt": int(current_time + (6 * 60 * 1000))  # 6 minutes from now
+            "expiresAt": int(current_time + (6 * 60 * 1000)),  # 6 minutes from now
         }
 
         self.assertFalse(manager.is_token_expired(valid_creds))
