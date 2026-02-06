@@ -16,8 +16,9 @@ This tool monitors Claude account usage through multiple APIs, displaying real-t
   - Rate Limit Tier: Displays your current rate limit tier
   - Progress Bars: Visual representation of usage percentage with color coding
   - Multiple Rate Limits: Shows 5-hour and 7-day limits when active
+  - Model-Specific Limits: Display 7-day Sonnet and Opus usage separately
   - Reset Timer: Countdown to next rate limit reset
-  - Pace-Maker Integration: Displays throttling status and tempo tracking when Claude Pace Maker installed
+  - Pace-Maker Integration: Displays throttling status, tempo tracking, blockage statistics, and stale data warnings when Claude Pace Maker installed
 - **Console Mode**:
   - Personal Claude Code Usage: Shows ONLY your individual Claude Code usage costs
   - MTD Tracking: Month-to-date spending for current user
@@ -275,13 +276,39 @@ OAuth tokens have an expiration time tracked in the credentials file:
 ### Pace-Maker Integration
 
 Optional integration with [Claude Pace Maker](https://github.com/LightspeedDMS/claude-pace-maker):
+
+**Throttling Status:**
 - Automatically detects Pace-Maker installation in `~/.claude-pace-maker`
 - Reads throttling status from Pace-Maker database and config
 - Displays real-time throttling decisions and delay timings
 - Shows deviation from target pace and constrained window
-- Shows tempo tracking status (enabled/disabled) with color coding
-- No installation required - read-only integration
 - Supports both adaptive and legacy pacing algorithms
+- **Stale Data Warning**: Displays warning when pace-maker usage data is outdated
+
+**Pacing Status Column:**
+- Algorithm status (adaptive/legacy)
+- Tempo tracking (on/off)
+- Subagent reminder (on/off)
+- Intent validation (on/off)
+- Langfuse connectivity (✓ Connected / ✗ Error)
+- TDD enforcement (on/off)
+- Model preference (auto/opus/sonnet/haiku)
+- Clean code rules count
+- **Pace Maker version** (e.g., v1.5.0)
+- **Usage Console version** (e.g., v1.1.0)
+- **24-hour error count** (color-coded: green=0, yellow=1-10, red=>10)
+
+**Blockages Column:**
+- Intent validation blocks
+- TDD enforcement blocks
+- Clean code violations
+- Pacing tempo blocks
+- Pacing quota blocks
+
+**Langfuse Metrics:**
+- Sessions created (24h)
+- Traces created (24h)
+- Spans created (24h)
 
 ## Troubleshooting
 
@@ -324,6 +351,31 @@ curl -I https://api.anthropic.com
 ## Contributing
 
 Contributions welcome! Please open an issue or submit a pull request.
+
+## Changelog
+
+### v1.1.0 (February 2026)
+- **Enhanced Pacing Status**: Added Langfuse connectivity check (✓/✗), Pace Maker version, Usage Console version, 24-hour error count with color coding
+- **Daily Log Support**: Updated to scan rotated log files for error counting
+- **Langfuse Metrics Display**: Shows sessions, traces, spans created in last 24 hours
+
+### v1.0.0 (January 2026)
+- **Two-Column Layout**: Pacing Status + Blockages side-by-side display
+- **Blockage Statistics**: Real-time counts for intent validation, TDD, clean code, pacing blocks
+- **Langfuse Telemetry Display**: Integration with pace-maker Langfuse metrics
+- **Stale Data Propagation**: Shows warning when pace-maker data is outdated
+- **5-Hour Limiter Status**: Consistent display with other status indicators
+
+### v0.9.0 (December 2025)
+- **Model-Specific Limits**: Display 7-day Sonnet and Opus usage separately
+- **Pace-Maker Integration**: Real-time throttling status, deviation display, tempo tracking
+- **Subagent Reminder Status**: Shows nudge configuration
+
+### v0.8.0 (November 2025)
+- **Dual Mode Support**: Code mode (OAuth) and Console mode (Admin API)
+- **Console Mode**: Personal Claude Code usage costs, MTD tracking, projections
+- **OAuth Token Management**: Auto-detection, expiry handling, refresh prompts
+- **Profile Display**: User info, organization, badges, rate tier
 
 ## License
 
