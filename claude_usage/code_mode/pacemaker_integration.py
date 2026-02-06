@@ -16,6 +16,9 @@ SECONDS_IN_24_HOURS = 86400
 # Default clean code rules count from pace-maker
 DEFAULT_CLEAN_CODE_RULES_COUNT = 17
 
+# Langfuse connection timeout in seconds
+LANGFUSE_CONNECTION_TIMEOUT = 3
+
 
 def _is_pipx_installation(install_path: str) -> bool:
     """Check if installation path indicates pipx installation
@@ -86,6 +89,44 @@ class PaceMakerReader:
         self._blockage_stats_cache = None
         self._blockage_stats_cache_time = 0
         self._cache_ttl_seconds = 5
+
+    def _get_pacemaker_src_path(self) -> Optional[Path]:
+        """Find pace-maker source directory path.
+
+        Returns:
+            Path to pace-maker src directory, or None if not found
+        """
+        pm_src = None
+
+        # Check if install_source file exists
+        install_source_file = self.pm_dir / "install_source"
+        if install_source_file.exists():
+            try:
+                with open(install_source_file) as f:
+                    source_path = f.read().strip()
+
+                    # Check if this is a pipx installation
+                    if _is_pipx_installation(source_path):
+                        # Find site-packages in pipx venv
+                        site_packages = _find_pipx_site_packages(source_path)
+                        if site_packages:
+                            pm_src = Path(site_packages)
+                    else:
+                        # Regular dev installation - use src directory
+                        pm_src = Path(source_path) / "src"
+            except (OSError, ValueError):
+                # Failed to read install_source - will try fallback location
+                pass
+
+        # Fallback: check standard installation location
+        if not pm_src or not pm_src.exists():
+            pm_src = self.pm_dir / "src"
+
+        # Return None if path doesn't exist
+        if pm_src and pm_src.exists():
+            return pm_src
+
+        return None
 
     def is_installed(self) -> bool:
         """Check if pace-maker is installed"""
@@ -538,35 +579,13 @@ class PaceMakerReader:
         try:
             import sys
 
-            # Try to find pace-maker source directory
-            pm_src = None
+            # Get pace-maker source directory
+            pm_src = self._get_pacemaker_src_path()
+            if not pm_src:
+                return DEFAULT_CLEAN_CODE_RULES_COUNT
 
-            # Check if install_source file exists
-            install_source_file = self.pm_dir / "install_source"
-            if install_source_file.exists():
-                try:
-                    with open(install_source_file) as f:
-                        source_path = f.read().strip()
-
-                        # Check if this is a pipx installation
-                        if _is_pipx_installation(source_path):
-                            # Find site-packages in pipx venv
-                            site_packages = _find_pipx_site_packages(source_path)
-                            if site_packages:
-                                pm_src = Path(site_packages)
-                        else:
-                            # Regular dev installation - use src directory
-                            pm_src = Path(source_path) / "src"
-                except (OSError, ValueError):
-                    # Failed to read install_source - will try fallback location
-                    pass
-
-            # Fallback: check standard installation location
-            if not pm_src or not pm_src.exists():
-                pm_src = self.pm_dir / "src"
-
-            # Add to path if exists
-            if pm_src and pm_src.exists() and str(pm_src) not in sys.path:
+            # Add to path if not already present
+            if str(pm_src) not in sys.path:
                 sys.path.insert(0, str(pm_src))
 
             # Import clean_code_rules module and get default rules
@@ -578,3 +597,121 @@ class PaceMakerReader:
         except (ImportError, AttributeError, OSError):
             # Cannot load pace-maker modules or rules - return default count
             return DEFAULT_CLEAN_CODE_RULES_COUNT
+
+    def test_langfuse_connection(self) -> Dict[str, Any]:
+        """Test Langfuse API connectivity.
+
+        Returns:
+            Dict with 'connected' (bool) and 'message' (str)
+        """
+        config = self._read_config()
+        if not config:
+            return {"connected": False, "message": "Config not found"}
+
+        base_url = config.get("langfuse_base_url")
+        public_key = config.get("langfuse_public_key")
+        secret_key = config.get("langfuse_secret_key")
+
+        if not all([base_url, public_key, secret_key]):
+            return {"connected": False, "message": "Not configured"}
+
+        try:
+            import sys
+
+            # Get pace-maker source directory
+            pm_src = self._get_pacemaker_src_path()
+            if not pm_src:
+                return {"connected": False, "message": "Langfuse client unavailable"}
+
+            # Add to path if not already present
+            if str(pm_src) not in sys.path:
+                sys.path.insert(0, str(pm_src))
+
+            from pacemaker.langfuse.client import test_connection
+
+            return test_connection(
+                base_url, public_key, secret_key, timeout=LANGFUSE_CONNECTION_TIMEOUT
+            )
+        except ImportError:
+            return {"connected": False, "message": "Langfuse client unavailable"}
+        except Exception as e:
+            return {"connected": False, "message": str(e)}
+
+    def get_pacemaker_version(self) -> str:
+        """Get pace-maker version string.
+
+        Returns:
+            Version string like "1.4.0" or "unknown"
+        """
+        try:
+            import sys
+
+            # Get pace-maker source directory
+            pm_src = self._get_pacemaker_src_path()
+            if not pm_src:
+                return "unknown"
+
+            # Add to path if not already present
+            if str(pm_src) not in sys.path:
+                sys.path.insert(0, str(pm_src))
+
+            from pacemaker import __version__
+
+            return __version__
+        except ImportError:
+            return "unknown"
+
+    def get_recent_error_count(self, hours: int = 24) -> int:
+        """Count ERROR-level log entries from the last N hours.
+
+        Scans rotated log files (today's and yesterday's) for errors.
+
+        Args:
+            hours: Number of hours to look back (default: 24)
+
+        Returns:
+            Count of ERROR entries within the time window
+        """
+        import re
+        from datetime import datetime, timedelta
+
+        LOG_FILE_PREFIX = "pace-maker-"
+        LOG_FILE_SUFFIX = ".log"
+
+        try:
+            cutoff_time = datetime.now() - timedelta(hours=hours)
+            error_count = 0
+            pattern = re.compile(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] \[ERROR\]")
+
+            # Get log files for last 2 days
+            log_files = []
+            for i in range(2):
+                date = datetime.now() - timedelta(days=i)
+                date_str = date.strftime("%Y-%m-%d")
+                log_path = self.pm_dir / f"{LOG_FILE_PREFIX}{date_str}{LOG_FILE_SUFFIX}"
+                if log_path.exists():
+                    log_files.append(log_path)
+
+            if not log_files:
+                return 0
+
+            for log_file in log_files:
+                try:
+                    with open(log_file, "r") as f:
+                        for line in f:
+                            match = pattern.match(line)
+                            if match:
+                                try:
+                                    ts = datetime.strptime(
+                                        match.group(1), "%Y-%m-%d %H:%M:%S"
+                                    )
+                                    if ts >= cutoff_time:
+                                        error_count += 1
+                                except ValueError:
+                                    continue
+                except (OSError, IOError):
+                    continue
+
+            return error_count
+        except Exception:
+            return 0

@@ -124,6 +124,25 @@ class CodeMonitor:
                 pacemaker_status["langfuse_enabled"] = (
                     self.pacemaker_reader.get_langfuse_status()
                 )
+                # Test Langfuse connection
+                pacemaker_status["langfuse_connection"] = (
+                    self.pacemaker_reader.test_langfuse_connection()
+                )
+                # Get versions
+                pacemaker_status["pacemaker_version"] = (
+                    self.pacemaker_reader.get_pacemaker_version()
+                )
+                # Usage console version
+                try:
+                    from claude_usage import __version__ as uc_version
+
+                    pacemaker_status["usage_console_version"] = uc_version
+                except ImportError:
+                    pacemaker_status["usage_console_version"] = "unknown"
+                # Error count
+                pacemaker_status["error_count_24h"] = (
+                    self.pacemaker_reader.get_recent_error_count(24)
+                )
             # Fetch blockage stats for the two-column bottom section
             blockage_stats = self.pacemaker_reader.get_blockage_stats_with_labels()
             # CRITICAL-1b: Fetch Langfuse metrics

@@ -490,6 +490,13 @@ class UsageRenderer:
         langfuse_enabled = pacemaker_status.get("langfuse_enabled", False)
         if langfuse_enabled:
             left_lines.append("Langfuse: [green]on[/green]")
+            # Add connectivity status (indented)
+            langfuse_conn = pacemaker_status.get("langfuse_connection", {})
+            if langfuse_conn.get("connected"):
+                left_lines.append("  [green]✓ Connected[/green]")
+            else:
+                msg = langfuse_conn.get("message", "Unknown error")
+                left_lines.append(f"  [red]✗ {msg}[/red]")
         else:
             left_lines.append("Langfuse: [yellow]off[/yellow]")
 
@@ -513,6 +520,23 @@ class UsageRenderer:
             left_lines.append(f"Rules: [green]{rules_count}[/green]")
         else:
             left_lines.append("Rules: [yellow]0[/yellow]")
+
+        # Version info
+        pm_version = pacemaker_status.get("pacemaker_version", "unknown")
+        uc_version = pacemaker_status.get("usage_console_version", "unknown")
+        left_lines.append(f"PM: [green]v{pm_version}[/green]")
+        left_lines.append(f"UC: [green]v{uc_version}[/green]")
+
+        # Error count (24h)
+        error_count = pacemaker_status.get("error_count_24h", 0)
+        if error_count == -1:
+            left_lines.append("Errors 24h: [yellow](log large)[/yellow]")
+        elif error_count == 0:
+            left_lines.append(f"Errors 24h: [green]{error_count}[/green]")
+        elif error_count <= 10:
+            left_lines.append(f"Errors 24h: [yellow]{error_count}[/yellow]")
+        else:
+            left_lines.append(f"Errors 24h: [red]{error_count}[/red]")
 
         # Last update time (no blank line - compact layout)
         if last_update:
