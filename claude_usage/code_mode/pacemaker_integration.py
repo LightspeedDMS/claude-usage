@@ -308,7 +308,8 @@ class PaceMakerReader:
             if not self.db_path.exists():
                 return None
 
-            conn = sqlite3.connect(str(self.db_path))
+            conn = sqlite3.connect(str(self.db_path), timeout=5.0)
+            conn.execute("PRAGMA journal_mode=WAL")
             cursor = conn.cursor()
 
             cursor.execute(
@@ -383,7 +384,8 @@ class PaceMakerReader:
             # Calculate cutoff timestamp (60 minutes ago)
             cutoff_timestamp = int(time.time()) - 3600
 
-            conn = sqlite3.connect(str(self.db_path))
+            conn = sqlite3.connect(str(self.db_path), timeout=5.0)
+            conn.execute("PRAGMA journal_mode=WAL")
             cursor = conn.cursor()
 
             # Query counts grouped by category
@@ -495,7 +497,8 @@ class PaceMakerReader:
 
             cutoff = time.time() - SECONDS_IN_24_HOURS
 
-            conn = sqlite3.connect(str(self.db_path))
+            conn = sqlite3.connect(str(self.db_path), timeout=5.0)
+            conn.execute("PRAGMA journal_mode=WAL")
             try:
                 cursor = conn.cursor()
 

@@ -58,8 +58,7 @@ class CodeStorage(BaseStorage):
         mtd_cost = mtd_data.get("total_cost_usd", 0)
         workspace_json = json.dumps(workspaces)
 
-        conn = self.get_connection()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor()
 
             cursor.execute(
@@ -76,10 +75,6 @@ class CodeStorage(BaseStorage):
             cursor.execute(
                 "DELETE FROM console_usage_snapshots WHERE timestamp < ?", (cutoff,)
             )
-
-            conn.commit()
-        finally:
-            conn.close()
 
         return True
 
@@ -100,8 +95,7 @@ class CodeAnalytics:
             current_timestamp = int(datetime.now().timestamp())
             cutoff = current_timestamp - self.storage.RATE_CALC_WINDOW
 
-            conn = self.storage.get_connection()
-            try:
+            with self.storage.get_connection(readonly=True) as conn:
                 cursor = conn.cursor()
 
                 cursor.execute(
@@ -116,8 +110,6 @@ class CodeAnalytics:
                 )
 
                 result = cursor.fetchone()
-            finally:
-                conn.close()
 
             if not result:
                 return None
