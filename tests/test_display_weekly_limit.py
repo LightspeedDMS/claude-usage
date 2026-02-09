@@ -2,10 +2,8 @@
 
 import unittest
 from io import StringIO
-from unittest.mock import MagicMock
 from claude_usage.code_mode.display import UsageRenderer
 from rich.console import Console
-from rich.text import Text
 
 
 class TestDisplayWeeklyLimit(unittest.TestCase):

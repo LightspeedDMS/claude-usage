@@ -7,7 +7,6 @@ These tests verify that database connections are configured with:
 """
 
 import sqlite3
-import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 

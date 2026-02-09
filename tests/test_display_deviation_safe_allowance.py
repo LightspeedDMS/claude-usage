@@ -12,7 +12,6 @@ Critical test case:
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
 from datetime import datetime
 from claude_usage.code_mode.display import UsageRenderer
 

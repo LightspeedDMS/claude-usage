@@ -3,9 +3,8 @@
 import unittest
 import json
 import tempfile
-import platform
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime
 from claude_usage.code_mode.auth import OAuthManager
 

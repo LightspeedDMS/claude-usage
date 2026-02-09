@@ -10,7 +10,6 @@ Verifies that:
 import unittest
 from datetime import datetime, timedelta
 from claude_usage.code_mode.display import UsageRenderer
-from claude_usage.code_mode.pacemaker_integration import PaceMakerReader
 from io import StringIO
 from rich.console import Console
 

@@ -9,7 +9,7 @@ import unittest
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime
 from claude_usage.code_mode.monitor import CodeMonitor
 
