@@ -427,7 +427,12 @@ class UsageRenderer:
         # are now displayed in the two-column bottom section via render_bottom_section()
 
     def render_bottom_section(
-        self, pacemaker_status, blockage_stats, last_update=None, langfuse_metrics=None
+        self,
+        pacemaker_status,
+        blockage_stats,
+        last_update=None,
+        langfuse_metrics=None,
+        secrets_metrics=None,
     ):
         """Render two-column bottom section with status and blockage stats.
 
@@ -436,6 +441,7 @@ class UsageRenderer:
             blockage_stats: Dict with human-readable blockage category labels and counts
             last_update: Optional datetime of last data update
             langfuse_metrics: Optional dict with Langfuse metrics (sessions, traces, spans, total)
+            secrets_metrics: Optional dict with secrets metrics (secrets_masked)
 
         Returns:
             Rich renderable Group with two-column layout
@@ -577,6 +583,22 @@ class UsageRenderer:
             right_lines.append(f"Traces:{traces:>{count_width}}")
             right_lines.append(f"Spans:{spans:>{count_width}}")
             right_lines.append(f"[bold]Total:{total:>{count_width}}[/bold]")
+        else:
+            right_lines.append("(unavailable)")
+
+        # Add Secrets metrics section
+        secrets_separator = "-" * 21  # Same width as langfuse separator
+        right_lines.append("")  # Blank line separator
+        right_lines.append("[bold]Secrets (last 24hrs)[/bold]")
+        right_lines.append(secrets_separator)
+
+        if secrets_metrics is not None:
+            # Display secrets masked count
+            masked = secrets_metrics.get("secrets_masked", 0)
+            right_lines.append(f"Masked:{masked:>{count_width}}")
+            # Display stored secrets count
+            stored = secrets_metrics.get("secrets_stored", 0)
+            right_lines.append(f"Stored:{stored:>{count_width}}")
         else:
             right_lines.append("(unavailable)")
 

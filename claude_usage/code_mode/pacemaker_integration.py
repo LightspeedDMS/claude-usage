@@ -538,6 +538,64 @@ class PaceMakerReader:
             # This is acceptable since return type documents None on failure
             return None
 
+    def get_secrets_metrics(self) -> Optional[Dict[str, int]]:
+        """Get secrets metrics for the last 24 hours.
+
+        Reads from secrets_metrics table in pace-maker database and sums
+        all buckets within the 24-hour window.
+
+        Returns:
+            Dict with keys:
+            - secrets_masked: Total secrets masked in last 24h
+            Returns None if database is unavailable or table doesn't exist.
+        """
+        if not self.db_path.exists():
+            return None
+
+        try:
+            import time
+
+            cutoff = time.time() - SECONDS_IN_24_HOURS
+
+            conn = sqlite3.connect(str(self.db_path), timeout=5.0)
+            conn.execute("PRAGMA journal_mode=WAL")
+            try:
+                cursor = conn.cursor()
+
+                # Query sum of all secrets masked within 24-hour window
+                cursor.execute(
+                    """
+                    SELECT COALESCE(SUM(secrets_masked_count), 0)
+                    FROM secrets_metrics
+                    WHERE bucket_timestamp >= ?
+                    """,
+                    (cutoff,),
+                )
+
+                row = cursor.fetchone()
+
+                if not row:
+                    return None
+
+                secrets_masked = int(row[0])
+
+                # Query count of stored secrets
+                cursor.execute("SELECT COUNT(*) FROM secrets")
+                stored_row = cursor.fetchone()
+                secrets_stored = int(stored_row[0]) if stored_row else 0
+
+                return {
+                    "secrets_masked": secrets_masked,
+                    "secrets_stored": secrets_stored,
+                }
+            finally:
+                conn.close()
+
+        except (sqlite3.Error, OSError):
+            # Graceful degradation - return None when database is unavailable
+            # This is acceptable since return type documents None on failure
+            return None
+
     def get_langfuse_status(self) -> bool:
         """Check if Langfuse integration is enabled and properly configured.
 

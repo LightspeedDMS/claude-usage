@@ -114,6 +114,7 @@ class CodeMonitor:
         weekly_limit_enabled = True  # Default
         blockage_stats = None
         langfuse_metrics = None
+        secrets_metrics = None
         if self.pacemaker_reader.is_installed():
             pacemaker_status = self.pacemaker_reader.get_status()
             if pacemaker_status:
@@ -147,6 +148,8 @@ class CodeMonitor:
             blockage_stats = self.pacemaker_reader.get_blockage_stats_with_labels()
             # CRITICAL-1b: Fetch Langfuse metrics
             langfuse_metrics = self.pacemaker_reader.get_langfuse_metrics()
+            # Fetch Secrets metrics
+            secrets_metrics = self.pacemaker_reader.get_secrets_metrics()
 
         main_display = self.renderer.render(
             self.error_message,
@@ -165,6 +168,7 @@ class CodeMonitor:
                 blockage_stats,
                 self.last_update,
                 langfuse_metrics=langfuse_metrics,
+                secrets_metrics=secrets_metrics,
             )
             return Group(main_display, bottom_section)
 
