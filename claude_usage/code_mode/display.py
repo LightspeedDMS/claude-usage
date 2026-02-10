@@ -568,7 +568,6 @@ class UsageRenderer:
             right_lines.append("(unavailable)")
 
         # Add Langfuse metrics section
-        right_lines.append("")  # Blank line separator
         right_lines.append("[bold]Langfuse (last 24hrs)[/bold]")
         right_lines.append(langfuse_separator)
 
@@ -588,7 +587,6 @@ class UsageRenderer:
 
         # Add Secrets metrics section
         secrets_separator = "-" * 21  # Same width as langfuse separator
-        right_lines.append("")  # Blank line separator
         right_lines.append("[bold]Secrets (last 24hrs)[/bold]")
         right_lines.append(secrets_separator)
 
