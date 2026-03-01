@@ -520,6 +520,23 @@ class UsageRenderer:
         else:
             left_lines.append(f"Model: [green]{preferred_model}[/green]")
 
+        # Log level (0=CRITICAL, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG)
+        log_level = pacemaker_status.get("log_level", 2)
+        log_level_names = {
+            0: "CRITICAL",
+            1: "ERROR",
+            2: "WARNING",
+            3: "INFO",
+            4: "DEBUG",
+        }
+        log_level_name = log_level_names.get(log_level, f"L{log_level}")
+        if log_level <= 2:
+            left_lines.append(f"Log: [green]{log_level_name}[/green]")
+        elif log_level == 3:
+            left_lines.append(f"Log: [yellow]{log_level_name}[/yellow]")
+        else:
+            left_lines.append(f"Log: [red]{log_level_name}[/red]")
+
         # Clean code rules count
         rules_count = pacemaker_status.get("clean_code_rules_count", 0)
         if rules_count > 0:

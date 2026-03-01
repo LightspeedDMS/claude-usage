@@ -19,6 +19,9 @@ DEFAULT_CLEAN_CODE_RULES_COUNT = 17
 # Langfuse connection timeout in seconds
 LANGFUSE_CONNECTION_TIMEOUT = 3
 
+# Default log level (2 = WARNING)
+DEFAULT_LOG_LEVEL = 2
+
 
 def _is_pipx_installation(install_path: str) -> bool:
     """Check if installation path indicates pipx installation
@@ -188,6 +191,7 @@ class PaceMakerReader:
                     "preferred_subagent_model", "auto"
                 ),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
+                "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
             }
 
         # Calculate pacing decision using pace-maker's algorithm
@@ -266,6 +270,7 @@ class PaceMakerReader:
                     "preferred_subagent_model", "auto"
                 ),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
+                "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "last_update": usage_data["timestamp"],
             }
 
@@ -289,6 +294,7 @@ class PaceMakerReader:
                     "preferred_subagent_model", "auto"
                 ),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
+                "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
             }
 
     def _read_config(self) -> Optional[Dict[str, Any]]:
