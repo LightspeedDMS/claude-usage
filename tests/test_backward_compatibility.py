@@ -95,7 +95,17 @@ class TestBackwardCompatibility:
                     None,
                 )
 
-                success = monitor.fetch_usage()
+                # Mock pace-maker backoff file to not exist (avoid real backoff state)
+                backoff_path = Path.home() / ".claude-pace-maker" / "api_backoff.json"
+                orig_exists = Path.exists
+
+                def patched_exists(self):
+                    if str(self) == str(backoff_path):
+                        return False
+                    return orig_exists(self)
+
+                with patch.object(Path, "exists", patched_exists):
+                    success = monitor.fetch_usage()
 
                 assert success, "Should successfully fetch usage in Code mode"
                 assert mock_fetch.called, "Should call api_client.fetch_usage"

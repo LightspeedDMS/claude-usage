@@ -1,5 +1,7 @@
 """API client for Anthropic Console usage monitoring"""
 
+import random
+import time
 import requests
 from datetime import date
 
@@ -65,27 +67,38 @@ class ConsoleAPIClient:
                 if page_param_key:
                     current_params[page_param_key] = next_page
 
-            try:
-                response = requests.get(
-                    url, params=current_params, headers=headers, timeout=(5, 10)
-                )
-            except requests.exceptions.Timeout:
-                return None, "Request timed out"
-            except requests.exceptions.RequestException as e:
-                return None, f"Network error: {e}"
+            # Retry loop for rate limiting
+            response = None
+            for attempt in range(3):
+                try:
+                    response = requests.get(
+                        url, params=current_params, headers=headers, timeout=(5, 10)
+                    )
+                except requests.exceptions.Timeout:
+                    return None, "Request timed out"
+                except requests.exceptions.RequestException as e:
+                    return None, f"Network error: {e}"
+
+                if response.status_code == 429 and attempt < 2:
+                    delay = 4 * (2**attempt) + random.uniform(0, 2)
+                    time.sleep(delay)
+                    continue
+                break
 
             # Check for errors
-            if response.status_code == 429:
+            if response is not None and response.status_code == 429:
                 return (
                     None,
-                    "Rate limit exceeded - please wait a few minutes and try again",
+                    "Rate limit exceeded after retries - please wait and try again",
                 )
-            elif response.status_code in (401, 403):
+            elif response is not None and response.status_code in (401, 403):
                 return None, "Authentication failed - check Admin API key"
-            elif response.status_code != 200:
+            elif response is None or response.status_code != 200:
+                status = response.status_code if response is not None else "unknown"
+                text = response.text[:100] if response is not None else "no response"
                 return (
                     None,
-                    f"API error: {response.status_code} - {response.text[:100]}",
+                    f"API error: {status} - {text}",
                 )
 
             try:

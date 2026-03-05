@@ -21,8 +21,9 @@ console = Console()
 class CodeMonitor:
     """Monitor Claude Code account usage via the discovered API"""
 
-    POLL_INTERVAL = 60  # seconds
-    CACHE_FRESHNESS_SECONDS = 90
+    POLL_INTERVAL = 300  # seconds between API calls (5 minutes — same as pace-maker)
+    DISPLAY_REFRESH_INTERVAL = 10  # seconds between display refreshes
+    CACHE_FRESHNESS_SECONDS = 360  # slightly above poll interval
 
     def __init__(self, credentials_path=None):
         if credentials_path is None:
@@ -76,6 +77,24 @@ class CodeMonitor:
                 self.credentials
             ):
                 return False
+
+        # Check pace-maker's backoff file — skip API if pace-maker is in backoff
+        # (we share the same API endpoint, so coordinated backoff avoids double-hammering)
+        pacemaker_backoff_path = Path.home() / ".claude-pace-maker" / "api_backoff.json"
+        try:
+            if pacemaker_backoff_path.exists():
+                backoff_data = json.loads(pacemaker_backoff_path.read_text())
+                backoff_until = backoff_data.get("backoff_until", 0)
+                if backoff_until and time.time() < backoff_until:
+                    self.error_message = (
+                        f"API backoff (pace-maker): "
+                        f"{backoff_until - time.time():.0f}s remaining"
+                    )
+                    return False
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+            logging.debug(
+                f"Failed to read pace-maker backoff file, proceeding with API: {e}"
+            )
 
         # Try pace-maker usage cache first (avoids redundant API calls)
         if self.pacemaker_reader.is_installed():
@@ -195,28 +214,35 @@ class CodeMonitor:
         return main_display
 
     def run(self):
-        """Main run loop for Code mode monitoring"""
+        """Main run loop for Code mode monitoring.
+
+        Display refreshes every DISPLAY_REFRESH_INTERVAL (10s).
+        API polling happens every POLL_INTERVAL (300s).
+        These are decoupled so the display stays responsive.
+        """
         # Fetch profile once at startup
         self.fetch_profile()
+
+        # Fetch usage immediately on startup
+        self.fetch_usage()
+        last_poll_time = time.time()
 
         try:
             with Live(refresh_per_second=1, console=console) as live:
                 while True:
-                    # Show initial display before fetching
+                    # Check if it's time to poll the API
+                    now = time.time()
+                    if now - last_poll_time >= self.POLL_INTERVAL:
+                        self.fetch_usage()
+                        last_poll_time = now
+
+                    # Refresh display (uses cached data)
                     display = self.get_display()
                     instruction = Text("Press Ctrl+C to stop", style="dim")
                     live.update(Group(display, instruction))
 
-                    # Fetch usage
-                    self.fetch_usage()
-
-                    # Update display again after fetching
-                    display = self.get_display()
-                    instruction = Text("Press Ctrl+C to stop", style="dim")
-                    live.update(Group(display, instruction))
-
-                    # Wait before next poll
-                    time.sleep(self.POLL_INTERVAL)
+                    # Short sleep for responsive display
+                    time.sleep(self.DISPLAY_REFRESH_INTERVAL)
 
         except KeyboardInterrupt:
             return 0

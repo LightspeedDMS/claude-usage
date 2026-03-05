@@ -186,7 +186,16 @@ class PaceMakerReader:
             return {
                 "enabled": enabled,
                 "has_data": False,
+                "intent_validation_enabled": config.get(
+                    "intent_validation_enabled", False
+                ),
                 "tdd_enabled": config.get("tdd_enabled", False),
+                "tempo_enabled": config.get("tempo_enabled", True),
+                "subagent_reminder_enabled": config.get(
+                    "subagent_reminder_enabled", True
+                ),
+                "weekly_limit_enabled": config.get("weekly_limit_enabled", True),
+                "five_hour_limit_enabled": config.get("five_hour_limit_enabled", True),
                 "preferred_subagent_model": config.get(
                     "preferred_subagent_model", "auto"
                 ),
