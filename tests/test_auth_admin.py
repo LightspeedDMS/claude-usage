@@ -6,7 +6,7 @@ import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
-from claude_usage.auth import AdminAuthManager
+from claude_usage.console_mode.auth import AdminAuthManager
 
 
 class TestAdminAuthManager(unittest.TestCase):

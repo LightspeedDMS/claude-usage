@@ -68,7 +68,7 @@ class TestBackwardCompatibility:
         with patch.dict("os.environ", env_without_admin_key, clear=True):
             monitor = ClaudeUsageMonitor(credentials_path=oauth_only_credentials_file)
 
-            from claude_usage.display import UsageRenderer
+            from claude_usage.code_mode.display import UsageRenderer
 
             assert isinstance(
                 monitor.renderer, UsageRenderer

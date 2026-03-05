@@ -14,7 +14,7 @@ import time
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
-from claude_usage.display import UsageRenderer
+from claude_usage.code_mode.display import UsageRenderer
 
 
 def main():

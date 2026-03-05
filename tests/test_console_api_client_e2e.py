@@ -2,7 +2,7 @@
 
 import unittest
 import os
-from claude_usage.api import ConsoleAPIClient
+from claude_usage.console_mode.api import ConsoleAPIClient
 
 
 class TestConsoleAPIClientE2E(unittest.TestCase):

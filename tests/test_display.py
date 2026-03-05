@@ -2,7 +2,7 @@
 
 import unittest
 from unittest.mock import patch, MagicMock
-from claude_usage.display import UsageRenderer
+from claude_usage.code_mode.display import UsageRenderer
 
 
 class TestUsageRenderer(unittest.TestCase):

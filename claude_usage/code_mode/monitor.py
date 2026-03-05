@@ -1,5 +1,7 @@
 """Code mode monitor for Claude Code usage tracking"""
 
+import json
+import logging
 import time
 from pathlib import Path
 from datetime import datetime
@@ -19,7 +21,8 @@ console = Console()
 class CodeMonitor:
     """Monitor Claude Code account usage via the discovered API"""
 
-    POLL_INTERVAL = 30  # seconds
+    POLL_INTERVAL = 60  # seconds
+    CACHE_FRESHNESS_SECONDS = 90
 
     def __init__(self, credentials_path=None):
         if credentials_path is None:
@@ -73,6 +76,23 @@ class CodeMonitor:
                 self.credentials
             ):
                 return False
+
+        # Try pace-maker usage cache first (avoids redundant API calls)
+        if self.pacemaker_reader.is_installed():
+            try:
+                cache_path = Path.home() / ".claude-pace-maker" / "usage_cache.json"
+                if cache_path.exists():
+                    cache = json.loads(cache_path.read_text())
+                    age = time.time() - cache.get("timestamp", 0)
+                    if age <= self.CACHE_FRESHNESS_SECONDS:
+                        self.last_usage = cache["response"]
+                        self.last_update = datetime.fromtimestamp(cache["timestamp"])
+                        self.error_message = None
+                        return True
+            except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+                logging.debug(
+                    f"Failed to read pace-maker cache, falling back to API: {e}"
+                )
 
         # Make API request
         headers = self.oauth_manager.get_auth_headers(self.credentials)
