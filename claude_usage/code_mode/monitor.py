@@ -78,32 +78,32 @@ class CodeMonitor:
             ):
                 return False
 
-        # Check pace-maker's backoff file — skip API if pace-maker is in backoff
-        # (we share the same API endpoint, so coordinated backoff avoids double-hammering)
+        # Detect pace-maker backoff BEFORE touching the API, but read the cache
+        # first so we can serve cached data even during backoff.
         pacemaker_backoff_path = Path.home() / ".claude-pace-maker" / "api_backoff.json"
+        pacemaker_in_backoff = False
+        backoff_remaining = 0.0
         try:
             if pacemaker_backoff_path.exists():
                 backoff_data = json.loads(pacemaker_backoff_path.read_text())
                 backoff_until = backoff_data.get("backoff_until", 0)
                 if backoff_until and time.time() < backoff_until:
-                    self.error_message = (
-                        f"API backoff (pace-maker): "
-                        f"{backoff_until - time.time():.0f}s remaining"
-                    )
-                    return False
+                    pacemaker_in_backoff = True
+                    backoff_remaining = backoff_until - time.time()
         except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
             logging.debug(
                 f"Failed to read pace-maker backoff file, proceeding with API: {e}"
             )
 
-        # Try pace-maker usage cache first (avoids redundant API calls)
+        # Try pace-maker usage cache (avoids redundant API calls).
+        # During backoff, accept stale cache — any age is better than an error screen.
         if self.pacemaker_reader.is_installed():
             try:
                 cache_path = Path.home() / ".claude-pace-maker" / "usage_cache.json"
                 if cache_path.exists():
                     cache = json.loads(cache_path.read_text())
                     age = time.time() - cache.get("timestamp", 0)
-                    if age <= self.CACHE_FRESHNESS_SECONDS:
+                    if age <= self.CACHE_FRESHNESS_SECONDS or pacemaker_in_backoff:
                         self.last_usage = cache["response"]
                         self.last_update = datetime.fromtimestamp(cache["timestamp"])
                         self.error_message = None
@@ -112,6 +112,17 @@ class CodeMonitor:
                 logging.debug(
                     f"Failed to read pace-maker cache, falling back to API: {e}"
                 )
+
+        # During backoff, skip the API entirely.
+        # If we already have last_usage from a previous fetch, keep it (full display).
+        # Only show the backoff error if we have absolutely no data.
+        if pacemaker_in_backoff:
+            if self.last_usage is not None:
+                return True
+            self.error_message = (
+                f"API backoff (pace-maker): {backoff_remaining:.0f}s remaining"
+            )
+            return False
 
         # Make API request
         headers = self.oauth_manager.get_auth_headers(self.credentials)
@@ -142,6 +153,11 @@ class CodeMonitor:
             self.account_uuid = account_uuid
             return True
         else:
+            # Profile data rarely changes — preserve the last known value so the
+            # full display keeps rendering even when the API is temporarily unavailable
+            # (e.g. during backoff). Only propagate the error when we have nothing.
+            if self.last_profile is not None:
+                return True
             if error:
                 self.error_message = error
             return False
