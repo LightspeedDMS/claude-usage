@@ -463,6 +463,10 @@ class UsageRenderer:
         left_lines.append("[bold]Pacing Status[/bold]")
         left_lines.append(status_separator)
 
+        # Fallback mode indicator (only when active)
+        if pacemaker_status.get("fallback_mode"):
+            left_lines.append("API: [yellow]fallback (est)[/yellow]")
+
         # Algorithm status
         algorithm = pacemaker_status.get("algorithm", "unknown")
         enabled = pacemaker_status.get("enabled", False)
