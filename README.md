@@ -285,6 +285,13 @@ Optional integration with [Claude Pace Maker](https://github.com/LightspeedDMS/c
 - Supports both adaptive and legacy pacing algorithms
 - **Stale Data Warning**: Displays warning when pace-maker usage data is outdated
 
+**Resilient Fallback Mode:**
+- When the Claude API returns 429 errors, the monitor continues displaying usage data via pace-maker's fallback mode
+- Utilization values are synthesized from accumulated token costs + baseline snapshot
+- The monitor reads from `UsageModel.get_current_usage()` which automatically returns real or synthetic data
+- Coefficient calibration happens transparently when the API recovers — predictions improve over time
+- No manual intervention needed: the monitor always shows the best available data
+
 **Pacing Status Column:**
 - Algorithm status (adaptive/legacy)
 - Tempo tracking (on/off)
@@ -353,6 +360,20 @@ curl -I https://api.anthropic.com
 Contributions welcome! Please open an issue or submit a pull request.
 
 ## Changelog
+
+### v1.4.0 (March 2026)
+- **Resilient Fallback Integration**: Monitor reads from `UsageModel.get_current_usage()` — automatically displays synthetic utilization estimates during API 429 outages
+- **Right-Aligned Status Values**: Both Pacing Status and Blockages columns now right-align values to column boundary for improved readability
+- **Wider Progress Bars**: Progress bars widened by 4 characters for better visual resolution
+- **Improved Limiter Labels**: "7-Day Limiter: disabled" matches "5-Hour Limiter: disabled" style (replaces old "(throttling disabled)" text)
+- **Plan Icon**: Added 📦 icon to Plan display line
+- **Always-On Bottom Section**: Bottom section (Pacing Status + Blockages + Langfuse + Secrets) always displays when pace-maker is installed, even without tracking data
+- **Secrets Metrics**: Shows masked and stored secrets counts in last 24 hours
+
+### v1.3.0 (February 2026)
+- **UsageModel Integration**: Monitor reads usage data via `UsageModel.get_current_usage()` single source of truth
+- **API Backoff Awareness**: Skips API calls when pace-maker is in exponential backoff, displays cached data instead
+- **Fallback Mode Display**: Shows synthetic utilization values during API 429 outages transparently
 
 ### v1.1.0 (February 2026)
 - **Enhanced Pacing Status**: Added Langfuse connectivity check (✓/✗), Pace Maker version, Usage Console version, 24-hour error count with color coding

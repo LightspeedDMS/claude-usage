@@ -5,6 +5,7 @@ in the usage monitor without requiring pace-maker to be installed.
 """
 
 import json
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -146,7 +147,7 @@ class PaceMakerReader:
         """Read fallback state from fallback_state.json.
 
         Returns:
-            Dict with 'state' key ('normal', 'fallback', 'trueup') and other
+            Dict with 'state' key ('normal' or 'fallback') and other
             fallback fields. Returns NORMAL defaults if file missing or corrupt.
         """
         _default: Dict[str, Any] = {
@@ -179,11 +180,31 @@ class PaceMakerReader:
     def is_fallback_active(self) -> bool:
         """Check if pace-maker is currently in fallback mode.
 
+        Delegates to UsageModel.is_fallback_active() which reads fallback_state_v2
+        from SQLite (single source of truth).
+
         Returns:
-            True if fallback state is 'fallback' or 'trueup', False otherwise.
+            True if fallback state is 'fallback', False otherwise.
         """
-        state = self._read_fallback_state()
-        return state.get("state") in ("fallback", "trueup")
+        try:
+            import sys
+
+            pm_src = self._get_pacemaker_src_path()
+            if pm_src and str(pm_src) not in sys.path:
+                sys.path.insert(0, str(pm_src))
+
+            from pacemaker.usage_model import UsageModel
+
+            model = UsageModel(db_path=str(self.pm_dir / "usage.db"))
+            return model.is_fallback_active()
+        except ImportError:
+            # UsageModel not installed — pace-maker not available
+            return False
+        except Exception as e:
+            logging.warning(
+                "Unexpected error checking fallback state via UsageModel: %s", e
+            )
+            return False
 
     def get_status(self) -> Optional[Dict[str, Any]]:
         """Get current pace-maker status including throttling state
@@ -251,34 +272,11 @@ class PaceMakerReader:
             # Import pace-maker's pacing engine
             import sys
 
-            # Try to find pace-maker source directory
-            pm_src = None
-
-            # Check if install_source file exists
-            install_source_file = self.pm_dir / "install_source"
-            if install_source_file.exists():
-                try:
-                    with open(install_source_file) as f:
-                        source_path = f.read().strip()
-
-                        # Check if this is a pipx installation
-                        if _is_pipx_installation(source_path):
-                            # Find site-packages in pipx venv
-                            site_packages = _find_pipx_site_packages(source_path)
-                            if site_packages:
-                                pm_src = Path(site_packages)
-                        else:
-                            # Regular dev installation - use src directory
-                            pm_src = Path(source_path) / "src"
-                except (OSError, ValueError):
-                    pass
-
-            # Fallback: check standard installation location
-            if not pm_src or not pm_src.exists():
-                pm_src = self.pm_dir / "src"
+            # Use shared helper to find pace-maker source directory (P7: no duplication)
+            pm_src = self._get_pacemaker_src_path()
 
             # Add to path if exists
-            if pm_src and pm_src.exists() and str(pm_src) not in sys.path:
+            if pm_src and str(pm_src) not in sys.path:
                 sys.path.insert(0, str(pm_src))
 
             from pacemaker import pacing_engine
@@ -295,6 +293,7 @@ class PaceMakerReader:
                 safety_buffer_pct=config.get("safety_buffer_pct", 95.0),
                 preload_hours=config.get("preload_hours", 12.0),
                 weekly_limit_enabled=config.get("weekly_limit_enabled", True),
+                five_hour_limit_enabled=config.get("five_hour_limit_enabled", True),
             )
 
             status_result = {
@@ -334,14 +333,19 @@ class PaceMakerReader:
                     status_result["error"] = decision["error"]
 
             # Add fallback mode indicators (Story #38)
-            fallback_state = self._read_fallback_state()
-            fallback_active = fallback_state.get("state") in ("fallback", "trueup")
+            fallback_active = self.is_fallback_active()
             status_result["fallback_mode"] = fallback_active
             status_result["is_synthetic"] = fallback_active
             if fallback_active:
                 status_result["fallback_message"] = (
                     "API unavailable - using estimated pacing"
                 )
+                # _get_latest_usage() already returns synthetic values from
+                # UsageModel/SQLite during fallback, so the main
+                # calculate_pacing_decision call above already has correct data.
+                # Just clear stale markers so display.py doesn't short-circuit.
+                status_result.pop("error", None)
+                status_result.pop("stale_data", None)
             else:
                 status_result["fallback_message"] = None
 
@@ -373,55 +377,44 @@ class PaceMakerReader:
             return None
 
     def _get_latest_usage(self) -> Optional[Dict[str, Any]]:
-        """Get latest usage snapshot from pace-maker database"""
+        """Get latest usage snapshot via UsageModel (single source of truth).
+
+        During fallback mode, UsageModel.get_current_usage() returns synthetic
+        estimates from fallback_state_v2 + accumulated_costs, so the monitor
+        always sees current values rather than stale real-API data.
+
+        Returns:
+            Dict with keys: timestamp, five_hour_util, five_hour_resets_at,
+            seven_day_util, seven_day_resets_at. Returns None if no data.
+        """
         try:
-            if not self.db_path.exists():
+            import sys
+
+            pm_src = self._get_pacemaker_src_path()
+            if pm_src and str(pm_src) not in sys.path:
+                sys.path.insert(0, str(pm_src))
+
+            from pacemaker.usage_model import UsageModel
+
+            model = UsageModel(db_path=str(self.db_path))
+            snapshot = model.get_current_usage()
+            if snapshot is None:
                 return None
-
-            conn = sqlite3.connect(str(self.db_path), timeout=5.0)
-            conn.execute("PRAGMA journal_mode=WAL")
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                SELECT timestamp, five_hour_util, five_hour_resets_at,
-                       seven_day_util, seven_day_resets_at
-                FROM usage_snapshots
-                ORDER BY timestamp DESC
-                LIMIT 1
-            """
-            )
-
-            row = cursor.fetchone()
-            conn.close()
-
-            if not row:
-                return None
-
-            # Parse datetime strings
-            five_hour_resets = None
-            if row[2]:
-                try:
-                    five_hour_resets = datetime.fromisoformat(row[2])
-                except (ValueError, TypeError):
-                    pass
-
-            seven_day_resets = None
-            if row[4]:
-                try:
-                    seven_day_resets = datetime.fromisoformat(row[4])
-                except (ValueError, TypeError):
-                    pass
 
             return {
-                "timestamp": datetime.fromtimestamp(row[0]),
-                "five_hour_util": row[1],
-                "five_hour_resets_at": five_hour_resets,
-                "seven_day_util": row[3],
-                "seven_day_resets_at": seven_day_resets,
+                "timestamp": snapshot.timestamp,
+                "five_hour_util": snapshot.five_hour_util,
+                "five_hour_resets_at": snapshot.five_hour_resets_at,
+                "seven_day_util": snapshot.seven_day_util,
+                "seven_day_resets_at": snapshot.seven_day_resets_at,
             }
-
-        except (sqlite3.Error, OSError):
+        except ImportError:
+            # UsageModel not installed — pace-maker not available
+            return None
+        except Exception as e:
+            logging.warning(
+                "Unexpected error getting latest usage via UsageModel: %s", e
+            )
             return None
 
     def get_blockage_stats(self) -> Optional[Dict[str, int]]:
@@ -497,7 +490,7 @@ class PaceMakerReader:
         """
         # Human-readable labels for categories (excluding 'other' - catch-all that's rarely used)
         category_labels = {
-            "intent_validation": "Intent Validation",
+            "intent_validation": "Intent Val.",
             "intent_validation_tdd": "Intent TDD",
             "intent_validation_cleancode": "Clean Code",
             "pacing_tempo": "Pacing Tempo",
@@ -804,7 +797,7 @@ class PaceMakerReader:
             Count of ERROR entries within the time window
         """
         import re
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         LOG_FILE_PREFIX = "pace-maker-"
         LOG_FILE_SUFFIX = ".log"

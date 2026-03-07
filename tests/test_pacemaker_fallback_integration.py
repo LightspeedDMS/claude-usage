@@ -71,7 +71,7 @@ def _write_usage_db(pm_dir: Path) -> None:
 
 def _write_fallback_state(pm_dir: Path, state: str, baseline_5h: float = 45.0,
                            baseline_7d: float = 30.0, accumulated_cost: float = 5.0) -> None:
-    """Helper: write fallback_state.json."""
+    """Helper: write fallback_state.json and populate SQLite fallback_state_v2 table."""
     content = {
         "state": state,
         "baseline_5h": baseline_5h,
@@ -80,6 +80,34 @@ def _write_fallback_state(pm_dir: Path, state: str, baseline_5h: float = 45.0,
         "entered_at": time.time() - 300,
     }
     (pm_dir / "fallback_state.json").write_text(json.dumps(content))
+
+    # Also populate SQLite fallback_state_v2 for UsageModel-based readers
+    db_path = pm_dir / "usage.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS fallback_state_v2 (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            state TEXT NOT NULL DEFAULT 'normal',
+            baseline_5h REAL DEFAULT 0.0,
+            baseline_7d REAL DEFAULT 0.0,
+            resets_at_5h TEXT,
+            resets_at_7d TEXT,
+            tier TEXT DEFAULT '5x',
+            entered_at REAL,
+            rollover_cost_5h REAL,
+            rollover_cost_7d REAL,
+            last_rollover_resets_5h TEXT,
+            last_rollover_resets_7d TEXT
+        )
+    """)
+    conn.execute(
+        """INSERT OR REPLACE INTO fallback_state_v2
+           (id, state, baseline_5h, baseline_7d, entered_at)
+           VALUES (1, ?, ?, ?, ?)""",
+        (state, baseline_5h, baseline_7d, content["entered_at"]),
+    )
+    conn.commit()
+    conn.close()
 
 
 class TestReadFallbackState:
@@ -178,8 +206,8 @@ class TestIsFallbackActive:
 
         assert reader.is_fallback_active() is True
 
-    def test_returns_true_when_state_is_trueup(self, tmp_path):
-        """is_fallback_active returns True when state is TRUEUP."""
+    def test_returns_false_when_state_is_trueup(self, tmp_path):
+        """is_fallback_active returns False when state is TRUEUP (removed state - only 'fallback' is valid)."""
         from claude_usage.code_mode.pacemaker_integration import PaceMakerReader
 
         pm_dir = _make_pm_dir(tmp_path)
@@ -188,7 +216,7 @@ class TestIsFallbackActive:
         reader = PaceMakerReader()
         reader.pm_dir = pm_dir
 
-        assert reader.is_fallback_active() is True
+        assert reader.is_fallback_active() is False
 
 
 class TestGetStatusFallbackMode:

@@ -95,23 +95,51 @@ class CodeMonitor:
                 f"Failed to read pace-maker backoff file, proceeding with API: {e}"
             )
 
-        # Try pace-maker usage cache (avoids redundant API calls).
-        # During backoff, accept stale cache — any age is better than an error screen.
+        # Try UsageModel (single source of truth) for cached data.
+        # During fallback, UsageModel returns synthetic values automatically.
+        # During backoff, accept any available data — better than an error screen.
         if self.pacemaker_reader.is_installed():
             try:
-                cache_path = Path.home() / ".claude-pace-maker" / "usage_cache.json"
-                if cache_path.exists():
-                    cache = json.loads(cache_path.read_text())
-                    age = time.time() - cache.get("timestamp", 0)
+                import sys
+
+                pm_src = self.pacemaker_reader._get_pacemaker_src_path()
+                if pm_src and str(pm_src) not in sys.path:
+                    sys.path.insert(0, str(pm_src))
+
+                from pacemaker.usage_model import UsageModel
+
+                model = UsageModel()
+                snapshot = model.get_current_usage()
+                if snapshot is not None:
+                    # Check freshness (unless in backoff — accept any age)
+                    age = (datetime.utcnow() - snapshot.timestamp).total_seconds()
                     if age <= self.CACHE_FRESHNESS_SECONDS or pacemaker_in_backoff:
-                        self.last_usage = cache["response"]
-                        self.last_update = datetime.fromtimestamp(cache["timestamp"])
+                        # Convert UsageSnapshot to the dict format self.last_usage expects
+                        self.last_usage = {
+                            "five_hour": {
+                                "utilization": snapshot.five_hour_util,
+                                "resets_at": (
+                                    snapshot.five_hour_resets_at.isoformat() + "+00:00"
+                                    if snapshot.five_hour_resets_at
+                                    else ""
+                                ),
+                            },
+                            "seven_day": {
+                                "utilization": snapshot.seven_day_util,
+                                "resets_at": (
+                                    snapshot.seven_day_resets_at.isoformat() + "+00:00"
+                                    if snapshot.seven_day_resets_at
+                                    else ""
+                                ),
+                            },
+                        }
+                        self.last_update = snapshot.timestamp
                         self.error_message = None
                         return True
-            except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
-                logging.debug(
-                    f"Failed to read pace-maker cache, falling back to API: {e}"
-                )
+            except ImportError:
+                logging.debug("UsageModel not available, falling back to API")
+            except Exception as e:
+                logging.debug(f"Failed to get usage via UsageModel: {e}")
 
         # During backoff, skip the API entirely.
         # If we already have last_usage from a previous fetch, keep it (full display).
@@ -216,7 +244,7 @@ class CodeMonitor:
         )
 
         # Add bottom section with blockage stats if pacemaker is available
-        if pacemaker_status and pacemaker_status.get("has_data"):
+        if pacemaker_status:
             # CRITICAL-1d: Pass langfuse_metrics parameter to render_bottom_section
             bottom_section = self.renderer.render_bottom_section(
                 pacemaker_status,

@@ -101,7 +101,7 @@ class UsageRenderer:
             content.append(Text(f"🏢 {org_name}", style="bold"))
             # Show plan badges on separate line if present
             if badges:
-                content.append(Text.from_markup("   Plan: " + " ".join(badges)))
+                content.append(Text.from_markup("📦 Plan: " + " ".join(badges)))
         if rate_tier:
             content.append(Text(f"⚡ Tier: {rate_tier}", style="dim"))
 
@@ -133,7 +133,7 @@ class UsageRenderer:
         progress = Progress(
             TextColumn("[bold]5-Hour Usage:  [/bold]"),
             BarColumn(
-                bar_width=14,
+                bar_width=26,
                 complete_style=bar_style,
                 finished_style=bar_style,
             ),
@@ -160,10 +160,12 @@ class UsageRenderer:
             now = datetime.utcnow()
             time_until = reset_time - now
 
-            hours = time_until.seconds // 3600
-            minutes = (time_until.seconds % 3600) // 60
-
-            content.append(Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan"))
+            if time_until.total_seconds() > 0:
+                hours = time_until.seconds // 3600
+                minutes = (time_until.seconds % 3600) // 60
+                content.append(Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan"))
+            else:
+                content.append(Text("⏰ Window expired", style="cyan"))
 
     def _render_seven_day_limit(self, content, seven_day, weekly_limit_enabled=True):
         """Render seven-day usage display
@@ -190,7 +192,7 @@ class UsageRenderer:
         progress = Progress(
             TextColumn("[bold]7-Day Usage:   [/bold]"),
             BarColumn(
-                bar_width=14,
+                bar_width=26,
                 complete_style=bar_style,
                 finished_style=bar_style,
             ),
@@ -202,25 +204,34 @@ class UsageRenderer:
 
         # Throttling disabled note below progress bar
         if not weekly_limit_enabled:
-            content.append(Text("(throttling disabled)", style="dim"))
+            content.append(
+                Text.from_markup(
+                    "7-Day Limiter: [yellow]disabled[/yellow]", style="dim"
+                )
+            )
 
         if resets_at:
             reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
             now = datetime.utcnow()
             time_until = reset_time - now
 
-            # Calculate days, hours, and minutes
-            days = time_until.days
-            hours = time_until.seconds // 3600
-            minutes = (time_until.seconds % 3600) // 60
+            if time_until.total_seconds() > 0:
+                # Calculate days, hours, and minutes
+                days = time_until.days
+                hours = time_until.seconds // 3600
+                minutes = (time_until.seconds % 3600) // 60
 
-            # Format the countdown message
-            if days > 0:
-                content.append(
-                    Text(f"⏰ Resets in: {days}d {hours}h {minutes}m", style="cyan")
-                )
+                # Format the countdown message
+                if days > 0:
+                    content.append(
+                        Text(f"⏰ Resets in: {days}d {hours}h {minutes}m", style="cyan")
+                    )
+                else:
+                    content.append(
+                        Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan")
+                    )
             else:
-                content.append(Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan"))
+                content.append(Text("⏰ Window expired", style="cyan"))
 
     def _render_model_specific_limits(self, content, usage_data):
         """Render model-specific 7-day usage limits (Sonnet, Opus) if available
@@ -267,7 +278,7 @@ class UsageRenderer:
         progress = Progress(
             TextColumn(f"[bold]{label}{padding}[/bold]"),
             BarColumn(
-                bar_width=14,
+                bar_width=26,
                 complete_style=bar_style,
                 finished_style=bar_style,
             ),
@@ -283,18 +294,23 @@ class UsageRenderer:
             now = datetime.utcnow()
             time_until = reset_time - now
 
-            # Calculate days, hours, and minutes
-            days = time_until.days
-            hours = time_until.seconds // 3600
-            minutes = (time_until.seconds % 3600) // 60
+            if time_until.total_seconds() > 0:
+                # Calculate days, hours, and minutes
+                days = time_until.days
+                hours = time_until.seconds // 3600
+                minutes = (time_until.seconds % 3600) // 60
 
-            # Format the countdown message
-            if days > 0:
-                content.append(
-                    Text(f"⏰ Resets in: {days}d {hours}h {minutes}m", style="cyan")
-                )
+                # Format the countdown message
+                if days > 0:
+                    content.append(
+                        Text(f"⏰ Resets in: {days}d {hours}h {minutes}m", style="cyan")
+                    )
+                else:
+                    content.append(
+                        Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan")
+                    )
             else:
-                content.append(Text(f"⏰ Resets in: {hours}h {minutes}m", style="cyan"))
+                content.append(Text("⏰ Window expired", style="cyan"))
 
     def _render_pacemaker(
         self, content, pm_status, last_usage, weekly_limit_enabled=True
@@ -344,19 +360,31 @@ class UsageRenderer:
 
         content.append(Text.from_markup(f"🎯 Pace Maker: {status_badge}"))
 
-        # Get window data
+        # Get window data — prefer constrained window, but always show
+        # informational data even when limits are disabled
         constrained = pm_status.get("constrained_window")
-        if not constrained:
-            content.append(Text("No active windows", style="dim"))
-            return
-
-        # Select which window to display (the constrained one)
         if constrained == "5-hour":
             window_data = pm_status.get("five_hour", {})
             window_label = "5-Hour"
-        else:
+        elif constrained == "7-day":
             window_data = pm_status.get("seven_day", {})
             window_label = "7-Day"
+        else:
+            # No constrained window (limits disabled) — pick best available
+            # for informational display
+            five_h = pm_status.get("five_hour", {})
+            seven_d = pm_status.get("seven_day", {})
+            if five_h.get("target", 0) > 0:
+                window_data = five_h
+                window_label = "5-Hour"
+                constrained = "5-hour"
+            elif seven_d.get("target", 0) > 0:
+                window_data = seven_d
+                window_label = "7-Day"
+                constrained = "7-day"
+            else:
+                content.append(Text("No active windows", style="dim"))
+                return
 
         target = window_data.get("target", 0)
 
@@ -385,7 +413,7 @@ class UsageRenderer:
         target_progress = Progress(
             TextColumn(f"[bold]{target_label}{padding}[/bold]"),
             BarColumn(
-                bar_width=14,
+                bar_width=26,
                 complete_style="cyan",
                 finished_style="cyan",
             ),
@@ -426,6 +454,23 @@ class UsageRenderer:
         # Note: Status indicators (Algorithm, Tempo, Subagent, Intent Validation)
         # are now displayed in the two-column bottom section via render_bottom_section()
 
+    def _fmt_kv(self, label, value, markup_value, width):
+        """Format a key-value pair with label left-aligned and value right-aligned.
+
+        Args:
+            label: Plain text label (e.g., "Algorithm:")
+            value: Plain text value for width calculation (e.g., "legacy")
+            markup_value: Rich markup value for display (e.g., "[green]legacy[/green]")
+            width: Total column width to right-align value within
+
+        Returns:
+            Formatted string with label and right-aligned markup value
+        """
+        padding = width - len(label) - len(value)
+        if padding < 1:
+            padding = 1
+        return f"{label}{' ' * padding}{markup_value}"
+
     def render_bottom_section(
         self,
         pacemaker_status,
@@ -448,10 +493,10 @@ class UsageRenderer:
         """
         # Layout constants
         status_col_width = 22
+        blockage_col_width = 21  # Matches blockage separator width
         status_separator = "-" * 18
         blockage_separator = "-" * 21  # 1 char longer than "Blockages (last hour)"
         langfuse_separator = "-" * 21  # Same width as blockage separator
-        count_width = 6
 
         # Create two-column table
         table = Table.grid(padding=(0, 2))
@@ -465,42 +510,76 @@ class UsageRenderer:
 
         # Fallback mode indicator (only when active)
         if pacemaker_status.get("fallback_mode"):
-            left_lines.append("API: [yellow]fallback (est)[/yellow]")
+            left_lines.append(
+                self._fmt_kv(
+                    "API:",
+                    "fallback (est)",
+                    "[yellow]fallback (est)[/yellow]",
+                    status_col_width,
+                )
+            )
 
         # Algorithm status
         algorithm = pacemaker_status.get("algorithm", "unknown")
         enabled = pacemaker_status.get("enabled", False)
         if enabled:
-            left_lines.append(f"Algorithm: [green]{algorithm}[/green]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Algorithm:",
+                    algorithm,
+                    f"[green]{algorithm}[/green]",
+                    status_col_width,
+                )
+            )
         else:
-            left_lines.append("Algorithm: [dim]inactive[/dim]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Algorithm:", "inactive", "[dim]inactive[/dim]", status_col_width
+                )
+            )
 
         # Tempo status
         tempo_enabled = pacemaker_status.get("tempo_enabled", True)
         if tempo_enabled:
-            left_lines.append("Tempo: [green]on[/green]")
+            left_lines.append(
+                self._fmt_kv("Tempo:", "on", "[green]on[/green]", status_col_width)
+            )
         else:
-            left_lines.append("Tempo: [yellow]off[/yellow]")
+            left_lines.append(
+                self._fmt_kv("Tempo:", "off", "[yellow]off[/yellow]", status_col_width)
+            )
 
         # Subagent status
         subagent_enabled = pacemaker_status.get("subagent_reminder_enabled", True)
         if subagent_enabled:
-            left_lines.append("Subagent: [green]on[/green]")
+            left_lines.append(
+                self._fmt_kv("Subagent:", "on", "[green]on[/green]", status_col_width)
+            )
         else:
-            left_lines.append("Subagent: [dim]idle[/dim]")
+            left_lines.append(
+                self._fmt_kv("Subagent:", "idle", "[dim]idle[/dim]", status_col_width)
+            )
 
         # Intent validation status
         intent_enabled = pacemaker_status.get("intent_validation_enabled", False)
         if intent_enabled:
-            left_lines.append("Intent Val: [green]on[/green]")
+            left_lines.append(
+                self._fmt_kv("Intent Val:", "on", "[green]on[/green]", status_col_width)
+            )
         else:
-            left_lines.append("Intent Val: [yellow]off[/yellow]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Intent Val:", "off", "[yellow]off[/yellow]", status_col_width
+                )
+            )
 
         # Langfuse status
         langfuse_enabled = pacemaker_status.get("langfuse_enabled", False)
         if langfuse_enabled:
-            left_lines.append("Langfuse: [green]on[/green]")
-            # Add connectivity status (indented)
+            left_lines.append(
+                self._fmt_kv("Langfuse:", "on", "[green]on[/green]", status_col_width)
+            )
+            # Add connectivity status (indented - NOT reformatted)
             langfuse_conn = pacemaker_status.get("langfuse_connection", {})
             if langfuse_conn.get("connected"):
                 left_lines.append("  [green]✓ Connected[/green]")
@@ -508,21 +587,38 @@ class UsageRenderer:
                 msg = langfuse_conn.get("message", "Unknown error")
                 left_lines.append(f"  [red]✗ {msg}[/red]")
         else:
-            left_lines.append("Langfuse: [yellow]off[/yellow]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Langfuse:", "off", "[yellow]off[/yellow]", status_col_width
+                )
+            )
 
         # TDD status
         tdd_enabled = pacemaker_status.get("tdd_enabled", False)
         if tdd_enabled:
-            left_lines.append("TDD: [green]on[/green]")
+            left_lines.append(
+                self._fmt_kv("TDD:", "on", "[green]on[/green]", status_col_width)
+            )
         else:
-            left_lines.append("TDD: [yellow]off[/yellow]")
+            left_lines.append(
+                self._fmt_kv("TDD:", "off", "[yellow]off[/yellow]", status_col_width)
+            )
 
         # Model preference status
         preferred_model = pacemaker_status.get("preferred_subagent_model", "auto")
         if preferred_model == "auto":
-            left_lines.append("Model: [cyan]auto[/cyan]")
+            left_lines.append(
+                self._fmt_kv("Model:", "auto", "[cyan]auto[/cyan]", status_col_width)
+            )
         else:
-            left_lines.append(f"Model: [green]{preferred_model}[/green]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Model:",
+                    preferred_model,
+                    f"[green]{preferred_model}[/green]",
+                    status_col_width,
+                )
+            )
 
         # Log level (0=CRITICAL, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG)
         log_level = pacemaker_status.get("log_level", 2)
@@ -535,40 +631,116 @@ class UsageRenderer:
         }
         log_level_name = log_level_names.get(log_level, f"L{log_level}")
         if log_level <= 2:
-            left_lines.append(f"Log: [green]{log_level_name}[/green]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Log:",
+                    log_level_name,
+                    f"[green]{log_level_name}[/green]",
+                    status_col_width,
+                )
+            )
         elif log_level == 3:
-            left_lines.append(f"Log: [yellow]{log_level_name}[/yellow]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Log:",
+                    log_level_name,
+                    f"[yellow]{log_level_name}[/yellow]",
+                    status_col_width,
+                )
+            )
         else:
-            left_lines.append(f"Log: [red]{log_level_name}[/red]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Log:",
+                    log_level_name,
+                    f"[red]{log_level_name}[/red]",
+                    status_col_width,
+                )
+            )
 
         # Clean code rules count
         rules_count = pacemaker_status.get("clean_code_rules_count", 0)
         if rules_count > 0:
-            left_lines.append(f"Rules: [green]{rules_count}[/green]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Rules:",
+                    str(rules_count),
+                    f"[green]{rules_count}[/green]",
+                    status_col_width,
+                )
+            )
         else:
-            left_lines.append("Rules: [yellow]0[/yellow]")
+            left_lines.append(
+                self._fmt_kv("Rules:", "0", "[yellow]0[/yellow]", status_col_width)
+            )
 
         # Version info
         pm_version = pacemaker_status.get("pacemaker_version", "unknown")
         uc_version = pacemaker_status.get("usage_console_version", "unknown")
-        left_lines.append(f"PM: [green]v{pm_version}[/green]")
-        left_lines.append(f"UC: [green]v{uc_version}[/green]")
+        left_lines.append(
+            self._fmt_kv(
+                "PM:",
+                f"v{pm_version}",
+                f"[green]v{pm_version}[/green]",
+                status_col_width,
+            )
+        )
+        left_lines.append(
+            self._fmt_kv(
+                "UC:",
+                f"v{uc_version}",
+                f"[green]v{uc_version}[/green]",
+                status_col_width,
+            )
+        )
 
         # Error count (24h)
         error_count = pacemaker_status.get("error_count_24h", 0)
         if error_count == -1:
-            left_lines.append("Errors 24h: [yellow](log large)[/yellow]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Errors 24h:",
+                    "(log large)",
+                    "[yellow](log large)[/yellow]",
+                    status_col_width,
+                )
+            )
         elif error_count == 0:
-            left_lines.append(f"Errors 24h: [green]{error_count}[/green]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Errors 24h:",
+                    str(error_count),
+                    f"[green]{error_count}[/green]",
+                    status_col_width,
+                )
+            )
         elif error_count <= 10:
-            left_lines.append(f"Errors 24h: [yellow]{error_count}[/yellow]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Errors 24h:",
+                    str(error_count),
+                    f"[yellow]{error_count}[/yellow]",
+                    status_col_width,
+                )
+            )
         else:
-            left_lines.append(f"Errors 24h: [red]{error_count}[/red]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Errors 24h:",
+                    str(error_count),
+                    f"[red]{error_count}[/red]",
+                    status_col_width,
+                )
+            )
 
         # Last update time (no blank line - compact layout)
         if last_update:
             update_str = last_update.strftime("%H:%M:%S")
-            left_lines.append(f"[dim]Updated: {update_str}[/dim]")
+            left_lines.append(
+                self._fmt_kv(
+                    "Updated:", update_str, f"[dim]{update_str}[/dim]", status_col_width
+                )
+            )
 
         left_content = Text.from_markup("\n".join(left_lines))
 
@@ -581,10 +753,18 @@ class UsageRenderer:
             # Get categories from stats (excluding Total)
             for category, count in blockage_stats.items():
                 if category != "Total":
-                    right_lines.append(f"{category}:{count:>{count_width}}")
+                    right_lines.append(
+                        self._fmt_kv(
+                            f"{category}:", str(count), str(count), blockage_col_width
+                        )
+                    )
 
             total = blockage_stats.get("Total", 0)
-            right_lines.append(f"[bold]Total:{total:>{count_width}}[/bold]")
+            right_lines.append(
+                self._fmt_kv(
+                    "Total:", str(total), f"[bold]{total}[/bold]", blockage_col_width
+                )
+            )
         else:
             right_lines.append("(unavailable)")
 
@@ -599,10 +779,22 @@ class UsageRenderer:
             spans = langfuse_metrics.get("spans", 0)
             total = langfuse_metrics.get("total", 0)
 
-            right_lines.append(f"Sessions:{sessions:>{count_width}}")
-            right_lines.append(f"Traces:{traces:>{count_width}}")
-            right_lines.append(f"Spans:{spans:>{count_width}}")
-            right_lines.append(f"[bold]Total:{total:>{count_width}}[/bold]")
+            right_lines.append(
+                self._fmt_kv(
+                    "Sessions:", str(sessions), str(sessions), blockage_col_width
+                )
+            )
+            right_lines.append(
+                self._fmt_kv("Traces:", str(traces), str(traces), blockage_col_width)
+            )
+            right_lines.append(
+                self._fmt_kv("Spans:", str(spans), str(spans), blockage_col_width)
+            )
+            right_lines.append(
+                self._fmt_kv(
+                    "Total:", str(total), f"[bold]{total}[/bold]", blockage_col_width
+                )
+            )
         else:
             right_lines.append("(unavailable)")
 
@@ -614,10 +806,14 @@ class UsageRenderer:
         if secrets_metrics is not None:
             # Display secrets masked count
             masked = secrets_metrics.get("secrets_masked", 0)
-            right_lines.append(f"Masked:{masked:>{count_width}}")
+            right_lines.append(
+                self._fmt_kv("Masked:", str(masked), str(masked), blockage_col_width)
+            )
             # Display stored secrets count
             stored = secrets_metrics.get("secrets_stored", 0)
-            right_lines.append(f"Stored:{stored:>{count_width}}")
+            right_lines.append(
+                self._fmt_kv("Stored:", str(stored), str(stored), blockage_col_width)
+            )
         else:
             right_lines.append("(unavailable)")
 
