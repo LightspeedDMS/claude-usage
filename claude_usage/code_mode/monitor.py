@@ -59,8 +59,67 @@ class CodeMonitor:
         if error:
             self.error_message = error
 
+    def _refresh_from_model(self):
+        """Lightweight read from UsageModel — just a SQLite query, no API call.
+
+        Called on every display cycle so the monitor always shows the freshest
+        data written by the pace-maker hook (which polls the API every 60s).
+        """
+        if not self.pacemaker_reader.is_installed():
+            return False
+
+        try:
+            import sys
+
+            pm_src = self.pacemaker_reader._get_pacemaker_src_path()
+            if pm_src and str(pm_src) not in sys.path:
+                sys.path.insert(0, str(pm_src))
+
+            from pacemaker.usage_model import UsageModel
+
+            model = UsageModel()
+            snapshot = model.get_current_usage()
+            if snapshot is not None:
+                age = (datetime.utcnow() - snapshot.timestamp).total_seconds()
+                if age <= self.CACHE_FRESHNESS_SECONDS:
+                    self.last_usage = {
+                        "five_hour": {
+                            "utilization": snapshot.five_hour_util,
+                            "resets_at": (
+                                snapshot.five_hour_resets_at.isoformat() + "+00:00"
+                                if snapshot.five_hour_resets_at
+                                else ""
+                            ),
+                        },
+                        "seven_day": {
+                            "utilization": snapshot.seven_day_util,
+                            "resets_at": (
+                                snapshot.seven_day_resets_at.isoformat() + "+00:00"
+                                if snapshot.seven_day_resets_at
+                                else ""
+                            ),
+                        },
+                    }
+                    self.last_update = snapshot.timestamp
+                    self.error_message = None
+                    return True
+        except ImportError:
+            logging.debug("UsageModel not available, skipping model refresh")
+        except Exception as e:
+            logging.debug(f"Failed to refresh from UsageModel: {e}")
+
+        return False
+
     def fetch_usage(self):
-        """Fetch current usage data from Claude Code API"""
+        """Fetch usage data — heavyweight fallback with API call.
+
+        Called every POLL_INTERVAL (300s). When UsageModel is available,
+        _refresh_from_model() in the display loop provides data every cycle.
+        """
+        # Try UsageModel first (cheap SQLite read)
+        if self._refresh_from_model():
+            return True
+
         # Check if we need to reload credentials
         if not self.credentials:
             self._load_credentials()
@@ -94,52 +153,6 @@ class CodeMonitor:
             logging.debug(
                 f"Failed to read pace-maker backoff file, proceeding with API: {e}"
             )
-
-        # Try UsageModel (single source of truth) for cached data.
-        # During fallback, UsageModel returns synthetic values automatically.
-        # During backoff, accept any available data — better than an error screen.
-        if self.pacemaker_reader.is_installed():
-            try:
-                import sys
-
-                pm_src = self.pacemaker_reader._get_pacemaker_src_path()
-                if pm_src and str(pm_src) not in sys.path:
-                    sys.path.insert(0, str(pm_src))
-
-                from pacemaker.usage_model import UsageModel
-
-                model = UsageModel()
-                snapshot = model.get_current_usage()
-                if snapshot is not None:
-                    # Check freshness (unless in backoff — accept any age)
-                    age = (datetime.utcnow() - snapshot.timestamp).total_seconds()
-                    if age <= self.CACHE_FRESHNESS_SECONDS or pacemaker_in_backoff:
-                        # Convert UsageSnapshot to the dict format self.last_usage expects
-                        self.last_usage = {
-                            "five_hour": {
-                                "utilization": snapshot.five_hour_util,
-                                "resets_at": (
-                                    snapshot.five_hour_resets_at.isoformat() + "+00:00"
-                                    if snapshot.five_hour_resets_at
-                                    else ""
-                                ),
-                            },
-                            "seven_day": {
-                                "utilization": snapshot.seven_day_util,
-                                "resets_at": (
-                                    snapshot.seven_day_resets_at.isoformat() + "+00:00"
-                                    if snapshot.seven_day_resets_at
-                                    else ""
-                                ),
-                            },
-                        }
-                        self.last_update = snapshot.timestamp
-                        self.error_message = None
-                        return True
-            except ImportError:
-                logging.debug("UsageModel not available, falling back to API")
-            except Exception as e:
-                logging.debug(f"Failed to get usage via UsageModel: {e}")
 
         # During backoff, skip the API entirely.
         # If we already have last_usage from a previous fetch, keep it (full display).
@@ -274,13 +287,16 @@ class CodeMonitor:
         try:
             with Live(refresh_per_second=1, console=console) as live:
                 while True:
-                    # Check if it's time to poll the API
+                    # Re-read freshest data from UsageModel (cheap SQLite query)
+                    self._refresh_from_model()
+
+                    # Check if it's time to poll the API (fallback for no UsageModel)
                     now = time.time()
                     if now - last_poll_time >= self.POLL_INTERVAL:
                         self.fetch_usage()
                         last_poll_time = now
 
-                    # Refresh display (uses cached data)
+                    # Refresh display
                     display = self.get_display()
                     instruction = Text("Press Ctrl+C to stop", style="dim")
                     live.update(Group(display, instruction))
