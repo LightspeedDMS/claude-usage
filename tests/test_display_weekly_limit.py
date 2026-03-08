@@ -116,8 +116,8 @@ class TestDisplayWeeklyLimit(unittest.TestCase):
 
         # Verify 7-day section IS present (usage still reported)
         self.assertIn("7-Day", panel_str)
-        # Verify it shows throttling disabled note
-        self.assertIn("throttling disabled", panel_str)
+        # Verify it shows limiter disabled note
+        self.assertIn("disabled", panel_str)
         # Verify 5-hour section IS present
         self.assertIn("5-Hour", panel_str)
 

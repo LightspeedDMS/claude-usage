@@ -260,6 +260,24 @@ class CodeMonitor:
                 pacemaker_status["error_count_24h"] = (
                     self.pacemaker_reader.get_recent_error_count(24)
                 )
+                # API backoff status
+                try:
+                    import sys
+
+                    pm_src = self.pacemaker_reader._get_pacemaker_src_path()
+                    if pm_src and str(pm_src) not in sys.path:
+                        sys.path.insert(0, str(pm_src))
+                    from pacemaker.usage_model import UsageModel
+
+                    model = UsageModel()
+                    if model.is_in_backoff():
+                        pacemaker_status["api_backoff_remaining"] = (
+                            model.get_backoff_remaining()
+                        )
+                    else:
+                        pacemaker_status["api_backoff_remaining"] = 0
+                except (ImportError, Exception):
+                    pacemaker_status["api_backoff_remaining"] = 0
             # Fetch blockage stats for the two-column bottom section
             blockage_stats = self.pacemaker_reader.get_blockage_stats_with_labels()
             # CRITICAL-1b: Fetch Langfuse metrics
@@ -288,7 +306,8 @@ class CodeMonitor:
             )
             return Group(main_display, bottom_section)
 
-        return main_display
+        instruction = Text("Press Ctrl+C to stop", style="dim")
+        return Group(main_display, instruction)
 
     def run(self):
         """Main run loop for Code mode monitoring.
@@ -318,8 +337,7 @@ class CodeMonitor:
 
                     # Refresh display
                     display = self.get_display()
-                    instruction = Text("Press Ctrl+C to stop", style="dim")
-                    live.update(Group(display, instruction))
+                    live.update(display)
 
                     # Short sleep for responsive display
                     time.sleep(self.DISPLAY_REFRESH_INTERVAL)

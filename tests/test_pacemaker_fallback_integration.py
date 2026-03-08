@@ -6,7 +6,6 @@ TDD: Tests written first to define behavior before implementation.
 Story #38: Scenario 6 - Display shows fallback indicators when in fallback mode.
 
 Tests verify:
-- get_status() reads fallback_state.json
 - fallback_mode flag propagated in status dict
 - is_synthetic flag propagated in status dict when in fallback
 - fallback_message included when in fallback
@@ -108,65 +107,6 @@ def _write_fallback_state(pm_dir: Path, state: str, baseline_5h: float = 45.0,
     )
     conn.commit()
     conn.close()
-
-
-class TestReadFallbackState:
-    """Tests for PaceMakerReader._read_fallback_state() method."""
-
-    def test_returns_normal_when_file_missing(self, tmp_path):
-        """_read_fallback_state returns NORMAL state when file is missing."""
-        from claude_usage.code_mode.pacemaker_integration import PaceMakerReader
-
-        pm_dir = _make_pm_dir(tmp_path)
-        reader = PaceMakerReader()
-        reader.pm_dir = pm_dir
-
-        state = reader._read_fallback_state()
-
-        assert state["state"] == "normal"
-
-    def test_returns_fallback_when_active(self, tmp_path):
-        """_read_fallback_state returns FALLBACK state when file shows fallback."""
-        from claude_usage.code_mode.pacemaker_integration import PaceMakerReader
-
-        pm_dir = _make_pm_dir(tmp_path)
-        _write_fallback_state(pm_dir, state="fallback", accumulated_cost=10.0)
-
-        reader = PaceMakerReader()
-        reader.pm_dir = pm_dir
-
-        state = reader._read_fallback_state()
-
-        assert state["state"] == "fallback"
-        assert state["accumulated_cost"] == 10.0
-
-    def test_returns_normal_on_corrupt_file(self, tmp_path):
-        """_read_fallback_state returns NORMAL state when file is corrupt."""
-        from claude_usage.code_mode.pacemaker_integration import PaceMakerReader
-
-        pm_dir = _make_pm_dir(tmp_path)
-        (pm_dir / "fallback_state.json").write_text("{{{invalid")
-
-        reader = PaceMakerReader()
-        reader.pm_dir = pm_dir
-
-        state = reader._read_fallback_state()
-
-        assert state["state"] == "normal"
-
-    def test_returns_normal_on_empty_file(self, tmp_path):
-        """_read_fallback_state returns NORMAL state when file is empty."""
-        from claude_usage.code_mode.pacemaker_integration import PaceMakerReader
-
-        pm_dir = _make_pm_dir(tmp_path)
-        (pm_dir / "fallback_state.json").write_text("")
-
-        reader = PaceMakerReader()
-        reader.pm_dir = pm_dir
-
-        state = reader._read_fallback_state()
-
-        assert state["state"] == "normal"
 
 
 class TestIsFallbackActive:

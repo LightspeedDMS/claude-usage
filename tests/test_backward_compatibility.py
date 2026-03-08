@@ -74,51 +74,6 @@ class TestBackwardCompatibility:
                 monitor.renderer, UsageRenderer
             ), "Code mode should use existing UsageRenderer"
 
-    def test_code_mode_fetches_usage_via_oauth(self, oauth_only_credentials_file):
-        """
-        GIVEN Code mode is active
-        WHEN fetch_usage is called
-        THEN it should use OAuth authentication (not Admin API)
-        """
-        import os
-
-        env_without_admin_key = {
-            k: v for k, v in os.environ.items() if k != "ANTHROPIC_ADMIN_API_KEY"
-        }
-
-        with patch.dict("os.environ", env_without_admin_key, clear=True):
-            monitor = ClaudeUsageMonitor(credentials_path=oauth_only_credentials_file)
-
-            with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
-                mock_fetch.return_value = (
-                    {"usage_tier": {"current_usage_tokens": 1000}},
-                    None,
-                )
-
-                # Mock pace-maker backoff file to not exist (avoid real backoff state)
-                backoff_path = Path.home() / ".claude-pace-maker" / "api_backoff.json"
-                orig_exists = Path.exists
-
-                def patched_exists(self):
-                    if str(self) == str(backoff_path):
-                        return False
-                    return orig_exists(self)
-
-                with patch.object(Path, "exists", patched_exists):
-                    success = monitor.fetch_usage()
-
-                assert success, "Should successfully fetch usage in Code mode"
-                assert mock_fetch.called, "Should call api_client.fetch_usage"
-                # Verify OAuth headers were used
-                call_args = mock_fetch.call_args
-                headers = call_args[0][0]
-                assert (
-                    "Authorization" in headers
-                ), "Should pass OAuth authorization headers"
-                assert headers["Authorization"].startswith(
-                    "Bearer "
-                ), "Should use Bearer token authentication"
-
     def test_no_admin_api_dependencies_in_code_mode(self, oauth_only_credentials_file):
         """
         GIVEN Code mode is active

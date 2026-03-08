@@ -518,6 +518,18 @@ class UsageRenderer:
                     status_col_width,
                 )
             )
+            # API backoff countdown right below fallback indicator
+            api_backoff = pacemaker_status.get("api_backoff_remaining", 0)
+            if api_backoff > 0:
+                backoff_str = f"{int(api_backoff)}s"
+                left_lines.append(
+                    self._fmt_kv(
+                        "API Retry:",
+                        backoff_str,
+                        f"[yellow]{backoff_str}[/yellow]",
+                        status_col_width,
+                    )
+                )
 
         # Algorithm status
         algorithm = pacemaker_status.get("algorithm", "unknown")
@@ -822,4 +834,12 @@ class UsageRenderer:
         # Add row to table
         table.add_row(left_content, right_content)
 
-        return Group(table)
+        # Centered "Press Ctrl+C to stop" across the two-column width
+        total_width = (
+            status_col_width + 4 + blockage_col_width
+        )  # 22 + 4(padding) + 21 = 47
+        ctrl_text = "Press Ctrl+C to stop"
+        pad_left = (total_width - len(ctrl_text)) // 2
+        centered_instruction = Text(" " * pad_left + ctrl_text, style="dim")
+
+        return Group(table, centered_instruction)
