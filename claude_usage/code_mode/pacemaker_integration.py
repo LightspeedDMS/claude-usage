@@ -143,40 +143,6 @@ class PaceMakerReader:
             return False
         return config.get("enabled", False)
 
-    def _read_fallback_state(self) -> Dict[str, Any]:
-        """Read fallback state from fallback_state.json.
-
-        Returns:
-            Dict with 'state' key ('normal' or 'fallback') and other
-            fallback fields. Returns NORMAL defaults if file missing or corrupt.
-        """
-        _default: Dict[str, Any] = {
-            "state": "normal",
-            "baseline_5h": None,
-            "baseline_7d": None,
-            "accumulated_cost": 0.0,
-            "entered_at": None,
-        }
-
-        try:
-            fallback_path = self.pm_dir / "fallback_state.json"
-            if not fallback_path.exists():
-                return _default.copy()
-
-            text = fallback_path.read_text().strip()
-            if not text:
-                return _default.copy()
-
-            data = json.loads(text)
-            # Fill missing keys with defaults
-            for key in _default:
-                if key not in data:
-                    data[key] = _default[key]
-            return data
-
-        except Exception:
-            return _default.copy()
-
     def is_fallback_active(self) -> bool:
         """Check if pace-maker is currently in fallback mode.
 

@@ -137,22 +137,23 @@ class CodeMonitor:
             ):
                 return False
 
-        # Detect pace-maker backoff BEFORE touching the API, but read the cache
-        # first so we can serve cached data even during backoff.
-        pacemaker_backoff_path = Path.home() / ".claude-pace-maker" / "api_backoff.json"
+        # Detect pace-maker backoff via UsageModel (SQLite — single source of truth)
         pacemaker_in_backoff = False
         backoff_remaining = 0.0
         try:
-            if pacemaker_backoff_path.exists():
-                backoff_data = json.loads(pacemaker_backoff_path.read_text())
-                backoff_until = backoff_data.get("backoff_until", 0)
-                if backoff_until and time.time() < backoff_until:
-                    pacemaker_in_backoff = True
-                    backoff_remaining = backoff_until - time.time()
-        except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
-            logging.debug(
-                f"Failed to read pace-maker backoff file, proceeding with API: {e}"
-            )
+            import sys
+
+            pm_src = self.pacemaker_reader._get_pacemaker_src_path()
+            if pm_src and str(pm_src) not in sys.path:
+                sys.path.insert(0, str(pm_src))
+            from pacemaker.usage_model import UsageModel
+
+            model = UsageModel()
+            pacemaker_in_backoff = model.is_in_backoff()
+            if pacemaker_in_backoff:
+                backoff_remaining = model.get_backoff_remaining()
+        except (ImportError, Exception) as e:
+            logging.debug(f"Failed to check pace-maker backoff via UsageModel: {e}")
 
         # During backoff, skip the API entirely.
         # If we already have last_usage from a previous fetch, keep it (full display).
@@ -199,9 +200,28 @@ class CodeMonitor:
             # (e.g. during backoff). Only propagate the error when we have nothing.
             if self.last_profile is not None:
                 return True
+            # Fall back to pace-maker's profile cache file (written by hook)
+            cached = self._load_profile_cache()
+            if cached:
+                self.last_profile = cached
+                return True
             if error:
                 self.error_message = error
             return False
+
+    def _load_profile_cache(self):
+        """Load profile from pace-maker's profile_cache.json as fallback.
+
+        Returns profile dict or None if unavailable.
+        """
+        try:
+            cache_path = Path.home() / ".claude-pace-maker" / "profile_cache.json"
+            if not cache_path.exists():
+                return None
+            data = json.loads(cache_path.read_text().strip())
+            return data.get("profile")
+        except Exception:
+            return None
 
     def get_display(self):
         """Generate rich display for current usage"""

@@ -330,78 +330,84 @@ class TestCodeMonitorPacemakerBackoff(unittest.TestCase):
         self.assertEqual(CodeMonitor.CACHE_FRESHNESS_SECONDS, 360)
 
     def test_fetch_usage_skips_api_when_pacemaker_in_backoff(self):
-        """fetch_usage should skip API call when pace-maker backoff file indicates backoff."""
+        """fetch_usage should skip API call when UsageModel reports active backoff."""
         monitor = self._make_monitor()
 
-        # Simulate pace-maker backoff file with future backoff_until
-        future_time = time.time() + 600  # 10 minutes from now
-        backoff_data = json.dumps({"backoff_until": future_time, "consecutive_429s": 2})
+        with patch.object(monitor, '_refresh_from_model', return_value=False), \
+             patch("pacemaker.usage_model.UsageModel") as mock_usage_model_cls:
+            mock_model = MagicMock()
+            mock_model.is_in_backoff.return_value = True
+            mock_model.get_backoff_remaining.return_value = 600.0
+            mock_usage_model_cls.return_value = mock_model
 
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.read_text", return_value=backoff_data):
             result = monitor.fetch_usage()
 
         # API should not have been called
         monitor.api_client.fetch_usage.assert_not_called()
-        # Should return False (no data fetched)
+        # Should return False (no data fetched, no prior last_usage)
         self.assertFalse(result)
 
     def test_fetch_usage_proceeds_when_pacemaker_backoff_expired(self):
-        """fetch_usage should make API call when pace-maker backoff has expired."""
+        """fetch_usage should make API call when UsageModel reports backoff is no longer active."""
         monitor = self._make_monitor()
-
-        # Simulate pace-maker backoff file with past backoff_until
-        past_time = time.time() - 60  # expired 1 minute ago
-        backoff_data = json.dumps({"backoff_until": past_time, "consecutive_429s": 1})
 
         mock_response_data = {"usage": "data"}
         monitor.api_client.fetch_usage.return_value = (mock_response_data, None)
 
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.read_text", return_value=backoff_data):
+        with patch.object(monitor, '_refresh_from_model', return_value=False), \
+             patch("pacemaker.usage_model.UsageModel") as mock_usage_model_cls:
+            mock_model = MagicMock()
+            mock_model.is_in_backoff.return_value = False
+            mock_usage_model_cls.return_value = mock_model
+
             result = monitor.fetch_usage()
 
         monitor.api_client.fetch_usage.assert_called_once()
 
-    def test_fetch_usage_handles_missing_pacemaker_backoff_file_gracefully(self):
-        """fetch_usage should proceed normally when pace-maker backoff file doesn't exist."""
+    def test_fetch_usage_handles_usagemodel_import_failure_gracefully(self):
+        """fetch_usage should proceed normally when UsageModel import raises ImportError."""
         monitor = self._make_monitor()
         mock_response_data = {"usage": "data"}
         monitor.api_client.fetch_usage.return_value = (mock_response_data, None)
 
-        # Patch the specific backoff file path to not exist
-        # The cache file may exist but the backoff file should not
-        with patch("pathlib.Path.exists", return_value=False):
+        with patch.object(monitor, '_refresh_from_model', return_value=False), \
+             patch.dict("sys.modules", {"pacemaker.usage_model": None}):
             result = monitor.fetch_usage()
 
-        # Should still call API (no backoff file = no backoff)
+        # Should still call API (import failure = graceful fallthrough, no backoff assumed)
         monitor.api_client.fetch_usage.assert_called_once()
 
-    def test_fetch_usage_handles_corrupt_pacemaker_backoff_file_gracefully(self):
-        """fetch_usage should proceed normally when pace-maker backoff file is corrupt."""
+    def test_fetch_usage_handles_usagemodel_exception_gracefully(self):
+        """fetch_usage should proceed normally when UsageModel constructor raises Exception."""
         monitor = self._make_monitor()
         mock_response_data = {"usage": "data"}
         monitor.api_client.fetch_usage.return_value = (mock_response_data, None)
 
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.read_text", return_value="not-valid-json{{{"):
+        with patch.object(monitor, '_refresh_from_model', return_value=False), \
+             patch("pacemaker.usage_model.UsageModel") as mock_usage_model_cls:
+            mock_usage_model_cls.side_effect = Exception("DB error")
+
             result = monitor.fetch_usage()
 
-        # Should still proceed (corrupt file = treat as no backoff)
+        # Should still proceed (exception = treat as no backoff)
         monitor.api_client.fetch_usage.assert_called_once()
 
-    def test_fetch_usage_handles_backoff_file_with_no_backoff_until_key(self):
-        """fetch_usage should proceed normally when backoff file lacks backoff_until key."""
+    def test_fetch_usage_proceeds_when_not_in_backoff(self):
+        """fetch_usage should not call get_backoff_remaining when is_in_backoff returns False."""
         monitor = self._make_monitor()
         mock_response_data = {"usage": "data"}
         monitor.api_client.fetch_usage.return_value = (mock_response_data, None)
 
-        backoff_data = json.dumps({"consecutive_429s": 0})  # No backoff_until
+        with patch.object(monitor, '_refresh_from_model', return_value=False), \
+             patch("pacemaker.usage_model.UsageModel") as mock_usage_model_cls:
+            mock_model = MagicMock()
+            mock_model.is_in_backoff.return_value = False
+            mock_usage_model_cls.return_value = mock_model
 
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.read_text", return_value=backoff_data):
             result = monitor.fetch_usage()
 
+        # get_backoff_remaining should not be called when not in backoff
+        mock_model.get_backoff_remaining.assert_not_called()
         monitor.api_client.fetch_usage.assert_called_once()
 
 
