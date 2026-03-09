@@ -1,5 +1,6 @@
 """UI rendering for Code mode usage monitor"""
 
+import time
 from datetime import datetime, timezone
 from rich.progress import BarColumn, Progress, TextColumn
 from rich.table import Table
@@ -902,7 +903,9 @@ def render_activity_line(events: list) -> "Text":
     active = {e["event_code"]: e["status"] for e in events}
 
     text = Text()
-    text.append("▸ ", style=_IDLE_STYLE)
+    # Blink green/dim each second to show monitor loop is alive
+    arrow_style = "bold green" if int(time.time()) % 2 == 0 else _IDLE_STYLE
+    text.append("▸ ", style=arrow_style)
 
     all_known_codes = _get_all_known_codes()
     first_group = True
