@@ -80,7 +80,11 @@ class CodeMonitor:
             model = UsageModel()
             snapshot = model.get_current_usage()
             if snapshot is not None:
-                age = (datetime.now(timezone.utc) - snapshot.timestamp).total_seconds()
+                # UsageModel may return naive timestamps — assume UTC
+                ts = snapshot.timestamp
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                age = (datetime.now(timezone.utc) - ts).total_seconds()
                 # Accept stale data if we have nothing to show — always display bars
                 if age <= self.CACHE_FRESHNESS_SECONDS or self.last_usage is None:
                     self.last_usage = {
@@ -101,7 +105,7 @@ class CodeMonitor:
                             ),
                         },
                     }
-                    self.last_update = snapshot.timestamp
+                    self.last_update = ts
                     self.error_message = None
                     return True
         except ImportError:
