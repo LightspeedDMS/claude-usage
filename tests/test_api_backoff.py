@@ -3,11 +3,9 @@
 TDD: These tests define expected behavior. They will fail until implementation is added.
 """
 
-import json
 import time
 import unittest
-from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 from claude_usage.code_mode.api import ClaudeAPIClient
 from claude_usage.console_mode.api import ConsoleAPIClient
@@ -296,15 +294,22 @@ class TestCodeMonitorPacemakerBackoff(unittest.TestCase):
 
     def _make_monitor(self):
         """Create a CodeMonitor with all dependencies mocked."""
-        with patch("claude_usage.code_mode.monitor.OAuthManager"), \
-             patch("claude_usage.code_mode.monitor.ClaudeAPIClient"), \
-             patch("claude_usage.code_mode.monitor.CodeStorage"), \
-             patch("claude_usage.code_mode.monitor.CodeAnalytics"), \
-             patch("claude_usage.code_mode.monitor.UsageRenderer"), \
-             patch("claude_usage.code_mode.monitor.PaceMakerReader"):
+        with patch("claude_usage.code_mode.monitor.OAuthManager"), patch(
+            "claude_usage.code_mode.monitor.ClaudeAPIClient"
+        ), patch("claude_usage.code_mode.monitor.CodeStorage"), patch(
+            "claude_usage.code_mode.monitor.CodeAnalytics"
+        ), patch(
+            "claude_usage.code_mode.monitor.UsageRenderer"
+        ), patch(
+            "claude_usage.code_mode.monitor.PaceMakerReader"
+        ):
             from claude_usage.code_mode.monitor import CodeMonitor
+
             monitor = CodeMonitor.__new__(CodeMonitor)
-            monitor.credentials = {"access_token": "test-token", "expires_at": 9999999999}
+            monitor.credentials = {
+                "access_token": "test-token",
+                "expires_at": 9999999999,
+            }
             monitor.org_uuid = None
             monitor.account_uuid = None
             monitor.last_usage = None
@@ -316,25 +321,30 @@ class TestCodeMonitorPacemakerBackoff(unittest.TestCase):
             monitor.pacemaker_reader = MagicMock()
             monitor.pacemaker_reader.is_installed.return_value = False
             monitor.oauth_manager.is_token_expired.return_value = False
-            monitor.oauth_manager.get_auth_headers.return_value = {"Authorization": "Bearer test"}
+            monitor.oauth_manager.get_auth_headers.return_value = {
+                "Authorization": "Bearer test"
+            }
             return monitor
 
     def test_code_monitor_poll_interval_is_300_seconds(self):
         """POLL_INTERVAL should be 300 seconds (5 minutes)."""
         from claude_usage.code_mode.monitor import CodeMonitor
+
         self.assertEqual(CodeMonitor.POLL_INTERVAL, 300)
 
     def test_code_monitor_cache_freshness_is_360_seconds(self):
         """CACHE_FRESHNESS_SECONDS should be 360 seconds."""
         from claude_usage.code_mode.monitor import CodeMonitor
+
         self.assertEqual(CodeMonitor.CACHE_FRESHNESS_SECONDS, 360)
 
     def test_fetch_usage_skips_api_when_pacemaker_in_backoff(self):
         """fetch_usage should skip API call when UsageModel reports active backoff."""
         monitor = self._make_monitor()
 
-        with patch.object(monitor, '_refresh_from_model', return_value=False), \
-             patch("pacemaker.usage_model.UsageModel") as mock_usage_model_cls:
+        with patch.object(monitor, "_refresh_from_model", return_value=False), patch(
+            "pacemaker.usage_model.UsageModel"
+        ) as mock_usage_model_cls:
             mock_model = MagicMock()
             mock_model.is_in_backoff.return_value = True
             mock_model.get_backoff_remaining.return_value = 600.0
@@ -354,8 +364,9 @@ class TestCodeMonitorPacemakerBackoff(unittest.TestCase):
         mock_response_data = {"usage": "data"}
         monitor.api_client.fetch_usage.return_value = (mock_response_data, None)
 
-        with patch.object(monitor, '_refresh_from_model', return_value=False), \
-             patch("pacemaker.usage_model.UsageModel") as mock_usage_model_cls:
+        with patch.object(monitor, "_refresh_from_model", return_value=False), patch(
+            "pacemaker.usage_model.UsageModel"
+        ) as mock_usage_model_cls:
             mock_model = MagicMock()
             mock_model.is_in_backoff.return_value = False
             mock_usage_model_cls.return_value = mock_model
@@ -370,8 +381,9 @@ class TestCodeMonitorPacemakerBackoff(unittest.TestCase):
         mock_response_data = {"usage": "data"}
         monitor.api_client.fetch_usage.return_value = (mock_response_data, None)
 
-        with patch.object(monitor, '_refresh_from_model', return_value=False), \
-             patch.dict("sys.modules", {"pacemaker.usage_model": None}):
+        with patch.object(
+            monitor, "_refresh_from_model", return_value=False
+        ), patch.dict("sys.modules", {"pacemaker.usage_model": None}):
             result = monitor.fetch_usage()
 
         # Should still call API (import failure = graceful fallthrough, no backoff assumed)
@@ -383,8 +395,9 @@ class TestCodeMonitorPacemakerBackoff(unittest.TestCase):
         mock_response_data = {"usage": "data"}
         monitor.api_client.fetch_usage.return_value = (mock_response_data, None)
 
-        with patch.object(monitor, '_refresh_from_model', return_value=False), \
-             patch("pacemaker.usage_model.UsageModel") as mock_usage_model_cls:
+        with patch.object(monitor, "_refresh_from_model", return_value=False), patch(
+            "pacemaker.usage_model.UsageModel"
+        ) as mock_usage_model_cls:
             mock_usage_model_cls.side_effect = Exception("DB error")
 
             result = monitor.fetch_usage()
@@ -398,8 +411,9 @@ class TestCodeMonitorPacemakerBackoff(unittest.TestCase):
         mock_response_data = {"usage": "data"}
         monitor.api_client.fetch_usage.return_value = (mock_response_data, None)
 
-        with patch.object(monitor, '_refresh_from_model', return_value=False), \
-             patch("pacemaker.usage_model.UsageModel") as mock_usage_model_cls:
+        with patch.object(monitor, "_refresh_from_model", return_value=False), patch(
+            "pacemaker.usage_model.UsageModel"
+        ) as mock_usage_model_cls:
             mock_model = MagicMock()
             mock_model.is_in_backoff.return_value = False
             mock_usage_model_cls.return_value = mock_model

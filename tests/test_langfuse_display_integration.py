@@ -142,7 +142,9 @@ class TestLangfuseDisplayIntegration(unittest.TestCase):
         }
 
         result = self.renderer.render_bottom_section(
-            pacemaker_status, blockage_stats, langfuse_metrics=langfuse_metrics,
+            pacemaker_status,
+            blockage_stats,
+            langfuse_metrics=langfuse_metrics,
             secrets_metrics={"secrets_masked": 0, "secrets_stored": 0},
         )
 

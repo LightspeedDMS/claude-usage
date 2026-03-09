@@ -751,6 +751,55 @@ class PaceMakerReader:
         except ImportError:
             return "unknown"
 
+    def get_recent_activity(self, window_seconds: int = 10) -> list:
+        """Get the most recent activity event per event_code within the time window.
+
+        Reads from the activity_events table in the pace-maker SQLite database.
+        Returns one entry per event_code (most recent across all sessions).
+
+        Args:
+            window_seconds: How many seconds back to look (default 10)
+
+        Returns:
+            List of dicts with 'event_code' and 'status' keys.
+            Returns [] if database is unavailable or table does not exist.
+        """
+        if not self.db_path.exists():
+            return []
+
+        try:
+            import time
+
+            cutoff = time.time() - window_seconds
+
+            conn = sqlite3.connect(str(self.db_path), timeout=5.0)
+            conn.execute("PRAGMA journal_mode=WAL")
+            try:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT event_code, status
+                    FROM activity_events
+                    WHERE timestamp > ?
+                      AND id IN (
+                          SELECT id FROM activity_events ae2
+                          WHERE ae2.event_code = activity_events.event_code
+                            AND ae2.timestamp > ?
+                          ORDER BY ae2.timestamp DESC
+                          LIMIT 1
+                      )
+                    GROUP BY event_code
+                    """,
+                    (cutoff, cutoff),
+                )
+                rows = cursor.fetchall()
+                return [{"event_code": row[0], "status": row[1]} for row in rows]
+            finally:
+                conn.close()
+
+        except (sqlite3.Error, OSError):
+            return []
+
     def get_recent_error_count(self, hours: int = 24) -> int:
         """Count ERROR-level log entries from the last N hours.
 

@@ -31,7 +31,7 @@ class TestBaseStorageConcurrency:
         storage = TestStorage(db_path)
 
         # Mock sqlite3.connect to verify timeout parameter
-        with patch('claude_usage.shared.storage.sqlite3.connect') as mock_connect:
+        with patch("claude_usage.shared.storage.sqlite3.connect") as mock_connect:
             mock_conn = MagicMock()
             mock_connect.return_value = mock_conn
 
@@ -44,9 +44,9 @@ class TestBaseStorageConcurrency:
             call_args = mock_connect.call_args
 
             # Check that timeout parameter was provided
-            assert 'timeout' in call_args.kwargs or len(call_args.args) >= 2
-            if 'timeout' in call_args.kwargs:
-                assert call_args.kwargs['timeout'] > 0
+            assert "timeout" in call_args.kwargs or len(call_args.args) >= 2
+            if "timeout" in call_args.kwargs:
+                assert call_args.kwargs["timeout"] > 0
             else:
                 assert call_args.args[1] > 0
 
@@ -68,7 +68,7 @@ class TestBaseStorageConcurrency:
             result = cursor.fetchone()
 
             # WAL mode should be enabled
-            assert result[0].lower() == 'wal'
+            assert result[0].lower() == "wal"
 
     def test_get_connection_context_manager(self, tmp_path):
         """Test that get_connection() works as context manager"""
@@ -127,7 +127,7 @@ class TestBaseStorageConcurrency:
         storage = TestStorage(db_path)
 
         # Mock to verify read_uncommitted pragma is set
-        with patch('claude_usage.shared.storage.sqlite3.connect') as mock_connect:
+        with patch("claude_usage.shared.storage.sqlite3.connect") as mock_connect:
             mock_conn = MagicMock()
             mock_connect.return_value = mock_conn
 
@@ -137,7 +137,7 @@ class TestBaseStorageConcurrency:
 
             # Verify read_uncommitted was set
             execute_calls = [str(call) for call in mock_conn.execute.call_args_list]
-            assert any('read_uncommitted' in str(call) for call in execute_calls)
+            assert any("read_uncommitted" in str(call) for call in execute_calls)
 
 
 class TestPacemakerReaderConcurrency:
@@ -159,7 +159,8 @@ class TestPacemakerReaderConcurrency:
         conn.execute("PRAGMA journal_mode=WAL")
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE usage_snapshots (
                 timestamp INTEGER PRIMARY KEY,
                 five_hour_util REAL,
@@ -167,23 +168,28 @@ class TestPacemakerReaderConcurrency:
                 seven_day_util REAL,
                 seven_day_resets_at TEXT
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE blockage_events (
                 timestamp INTEGER,
                 category TEXT
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE langfuse_metrics (
                 bucket_timestamp REAL,
                 sessions_count INTEGER,
                 traces_count INTEGER,
                 spans_count INTEGER
             )
-        """)
+        """
+        )
 
         conn.commit()
         conn.close()
@@ -193,11 +199,13 @@ class TestPacemakerReaderConcurrency:
     def test_get_latest_usage_uses_timeout(self, mock_pm_dir, monkeypatch):
         """Test that _get_latest_usage() uses timeout parameter"""
         # Mock Path.home() to return our test directory
-        monkeypatch.setattr(Path, 'home', lambda: mock_pm_dir.parent)
+        monkeypatch.setattr(Path, "home", lambda: mock_pm_dir.parent)
 
         reader = PaceMakerReader()
 
-        with patch('claude_usage.code_mode.pacemaker_integration.sqlite3.connect') as mock_connect:
+        with patch(
+            "claude_usage.code_mode.pacemaker_integration.sqlite3.connect"
+        ) as mock_connect:
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_cursor.fetchone.return_value = None
@@ -211,19 +219,21 @@ class TestPacemakerReaderConcurrency:
             call_args = mock_connect.call_args
 
             # Check timeout parameter
-            assert 'timeout' in call_args.kwargs or len(call_args.args) >= 2
-            if 'timeout' in call_args.kwargs:
-                assert call_args.kwargs['timeout'] > 0
+            assert "timeout" in call_args.kwargs or len(call_args.args) >= 2
+            if "timeout" in call_args.kwargs:
+                assert call_args.kwargs["timeout"] > 0
             else:
                 assert call_args.args[1] > 0
 
     def test_get_latest_usage_enables_wal(self, mock_pm_dir, monkeypatch):
         """Test that _get_latest_usage() enables WAL mode"""
-        monkeypatch.setattr(Path, 'home', lambda: mock_pm_dir.parent)
+        monkeypatch.setattr(Path, "home", lambda: mock_pm_dir.parent)
 
         reader = PaceMakerReader()
 
-        with patch('claude_usage.code_mode.pacemaker_integration.sqlite3.connect') as mock_connect:
+        with patch(
+            "claude_usage.code_mode.pacemaker_integration.sqlite3.connect"
+        ) as mock_connect:
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_cursor.fetchone.return_value = None
@@ -234,15 +244,20 @@ class TestPacemakerReaderConcurrency:
 
             # Verify WAL mode was enabled
             execute_calls = [str(call) for call in mock_conn.execute.call_args_list]
-            assert any('journal_mode' in str(call) and 'WAL' in str(call) for call in execute_calls)
+            assert any(
+                "journal_mode" in str(call) and "WAL" in str(call)
+                for call in execute_calls
+            )
 
     def test_get_blockage_stats_uses_timeout(self, mock_pm_dir, monkeypatch):
         """Test that get_blockage_stats() uses timeout parameter"""
-        monkeypatch.setattr(Path, 'home', lambda: mock_pm_dir.parent)
+        monkeypatch.setattr(Path, "home", lambda: mock_pm_dir.parent)
 
         reader = PaceMakerReader()
 
-        with patch('claude_usage.code_mode.pacemaker_integration.sqlite3.connect') as mock_connect:
+        with patch(
+            "claude_usage.code_mode.pacemaker_integration.sqlite3.connect"
+        ) as mock_connect:
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_cursor.fetchall.return_value = []
@@ -253,15 +268,17 @@ class TestPacemakerReaderConcurrency:
 
             # Verify timeout parameter
             call_args = mock_connect.call_args
-            assert 'timeout' in call_args.kwargs or len(call_args.args) >= 2
+            assert "timeout" in call_args.kwargs or len(call_args.args) >= 2
 
     def test_get_blockage_stats_enables_wal(self, mock_pm_dir, monkeypatch):
         """Test that get_blockage_stats() enables WAL mode"""
-        monkeypatch.setattr(Path, 'home', lambda: mock_pm_dir.parent)
+        monkeypatch.setattr(Path, "home", lambda: mock_pm_dir.parent)
 
         reader = PaceMakerReader()
 
-        with patch('claude_usage.code_mode.pacemaker_integration.sqlite3.connect') as mock_connect:
+        with patch(
+            "claude_usage.code_mode.pacemaker_integration.sqlite3.connect"
+        ) as mock_connect:
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_cursor.fetchall.return_value = []
@@ -272,15 +289,20 @@ class TestPacemakerReaderConcurrency:
 
             # Verify WAL mode
             execute_calls = [str(call) for call in mock_conn.execute.call_args_list]
-            assert any('journal_mode' in str(call) and 'WAL' in str(call) for call in execute_calls)
+            assert any(
+                "journal_mode" in str(call) and "WAL" in str(call)
+                for call in execute_calls
+            )
 
     def test_get_langfuse_metrics_uses_timeout(self, mock_pm_dir, monkeypatch):
         """Test that get_langfuse_metrics() uses timeout parameter"""
-        monkeypatch.setattr(Path, 'home', lambda: mock_pm_dir.parent)
+        monkeypatch.setattr(Path, "home", lambda: mock_pm_dir.parent)
 
         reader = PaceMakerReader()
 
-        with patch('claude_usage.code_mode.pacemaker_integration.sqlite3.connect') as mock_connect:
+        with patch(
+            "claude_usage.code_mode.pacemaker_integration.sqlite3.connect"
+        ) as mock_connect:
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_cursor.fetchone.return_value = (0, 0, 0)
@@ -291,15 +313,17 @@ class TestPacemakerReaderConcurrency:
 
             # Verify timeout parameter
             call_args = mock_connect.call_args
-            assert 'timeout' in call_args.kwargs or len(call_args.args) >= 2
+            assert "timeout" in call_args.kwargs or len(call_args.args) >= 2
 
     def test_get_langfuse_metrics_enables_wal(self, mock_pm_dir, monkeypatch):
         """Test that get_langfuse_metrics() enables WAL mode"""
-        monkeypatch.setattr(Path, 'home', lambda: mock_pm_dir.parent)
+        monkeypatch.setattr(Path, "home", lambda: mock_pm_dir.parent)
 
         reader = PaceMakerReader()
 
-        with patch('claude_usage.code_mode.pacemaker_integration.sqlite3.connect') as mock_connect:
+        with patch(
+            "claude_usage.code_mode.pacemaker_integration.sqlite3.connect"
+        ) as mock_connect:
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_cursor.fetchone.return_value = (0, 0, 0)
@@ -310,4 +334,7 @@ class TestPacemakerReaderConcurrency:
 
             # Verify WAL mode
             execute_calls = [str(call) for call in mock_conn.execute.call_args_list]
-            assert any('journal_mode' in str(call) and 'WAL' in str(call) for call in execute_calls)
+            assert any(
+                "journal_mode" in str(call) and "WAL" in str(call)
+                for call in execute_calls
+            )

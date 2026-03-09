@@ -16,7 +16,6 @@ import sqlite3
 import time
 from pathlib import Path
 
-import pytest
 import sys
 
 # Add claude-usage src to path
@@ -49,7 +48,8 @@ def _write_usage_db(pm_dir: Path) -> None:
     db_path = pm_dir / "usage.db"
     future_str = "2099-12-31T23:59:59"
     conn = sqlite3.connect(str(db_path))
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS usage_snapshots (
             id INTEGER PRIMARY KEY,
             timestamp REAL,
@@ -59,7 +59,8 @@ def _write_usage_db(pm_dir: Path) -> None:
             seven_day_resets_at TEXT,
             session_id TEXT
         )
-    """)
+    """
+    )
     conn.execute(
         "INSERT INTO usage_snapshots VALUES (NULL, ?, ?, ?, ?, ?, ?)",
         (time.time(), 45.0, future_str, 30.0, future_str, "test-session"),
@@ -68,8 +69,13 @@ def _write_usage_db(pm_dir: Path) -> None:
     conn.close()
 
 
-def _write_fallback_state(pm_dir: Path, state: str, baseline_5h: float = 45.0,
-                           baseline_7d: float = 30.0, accumulated_cost: float = 5.0) -> None:
+def _write_fallback_state(
+    pm_dir: Path,
+    state: str,
+    baseline_5h: float = 45.0,
+    baseline_7d: float = 30.0,
+    accumulated_cost: float = 5.0,
+) -> None:
     """Helper: write fallback_state.json and populate SQLite fallback_state_v2 table."""
     content = {
         "state": state,
@@ -83,7 +89,8 @@ def _write_fallback_state(pm_dir: Path, state: str, baseline_5h: float = 45.0,
     # Also populate SQLite fallback_state_v2 for UsageModel-based readers
     db_path = pm_dir / "usage.db"
     conn = sqlite3.connect(str(db_path))
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS fallback_state_v2 (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             state TEXT NOT NULL DEFAULT 'normal',
@@ -98,7 +105,8 @@ def _write_fallback_state(pm_dir: Path, state: str, baseline_5h: float = 45.0,
             last_rollover_resets_5h TEXT,
             last_rollover_resets_7d TEXT
         )
-    """)
+    """
+    )
     conn.execute(
         """INSERT OR REPLACE INTO fallback_state_v2
            (id, state, baseline_5h, baseline_7d, entered_at)

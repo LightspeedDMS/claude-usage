@@ -8,7 +8,6 @@ The fix checks total_seconds() > 0 and shows "Window expired" instead.
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from claude_usage.code_mode.display import UsageRenderer
 
@@ -47,9 +46,9 @@ class TestFiveHourLimitExpired:
         }
         renderer._render_five_hour_limit(content, five_hour_data)
         texts = _text_strings(content)
-        assert any("Window expired" in t for t in texts), (
-            f"Expected 'Window expired' in output, got: {texts}"
-        )
+        assert any(
+            "Window expired" in t for t in texts
+        ), f"Expected 'Window expired' in output, got: {texts}"
 
     def test_expired_resets_at_does_not_show_nonsensical_hours(self):
         renderer = UsageRenderer()
@@ -61,9 +60,9 @@ class TestFiveHourLimitExpired:
         renderer._render_five_hour_limit(content, five_hour_data)
         texts = _text_strings(content)
         # Must not show "Resets in: 19h" or similar nonsensical value
-        assert not any("Resets in:" in t for t in texts), (
-            f"Expected no 'Resets in:' countdown for expired window, got: {texts}"
-        )
+        assert not any(
+            "Resets in:" in t for t in texts
+        ), f"Expected no 'Resets in:' countdown for expired window, got: {texts}"
 
     def test_future_resets_at_shows_countdown(self):
         renderer = UsageRenderer()
@@ -74,9 +73,9 @@ class TestFiveHourLimitExpired:
         }
         renderer._render_five_hour_limit(content, five_hour_data)
         texts = _text_strings(content)
-        assert any("Resets in:" in t for t in texts), (
-            f"Expected countdown for future window, got: {texts}"
-        )
+        assert any(
+            "Resets in:" in t for t in texts
+        ), f"Expected countdown for future window, got: {texts}"
 
     def test_no_resets_at_renders_without_countdown(self):
         renderer = UsageRenderer()
@@ -98,9 +97,9 @@ class TestSevenDayLimitExpired:
         }
         renderer._render_seven_day_limit(content, seven_day_data)
         texts = _text_strings(content)
-        assert any("Window expired" in t for t in texts), (
-            f"Expected 'Window expired' in output, got: {texts}"
-        )
+        assert any(
+            "Window expired" in t for t in texts
+        ), f"Expected 'Window expired' in output, got: {texts}"
 
     def test_expired_resets_at_does_not_show_nonsensical_hours(self):
         renderer = UsageRenderer()
@@ -111,9 +110,9 @@ class TestSevenDayLimitExpired:
         }
         renderer._render_seven_day_limit(content, seven_day_data)
         texts = _text_strings(content)
-        assert not any("Resets in:" in t for t in texts), (
-            f"Expected no countdown for expired window, got: {texts}"
-        )
+        assert not any(
+            "Resets in:" in t for t in texts
+        ), f"Expected no countdown for expired window, got: {texts}"
 
     def test_future_resets_at_shows_countdown(self):
         renderer = UsageRenderer()
@@ -124,9 +123,9 @@ class TestSevenDayLimitExpired:
         }
         renderer._render_seven_day_limit(content, seven_day_data)
         texts = _text_strings(content)
-        assert any("Resets in:" in t for t in texts), (
-            f"Expected countdown for future window, got: {texts}"
-        )
+        assert any(
+            "Resets in:" in t for t in texts
+        ), f"Expected countdown for future window, got: {texts}"
 
 
 class TestModelLimitExpired:
@@ -139,9 +138,9 @@ class TestModelLimitExpired:
         }
         renderer._render_model_limit(content, model_data, "Sonnet")
         texts = _text_strings(content)
-        assert any("Window expired" in t for t in texts), (
-            f"Expected 'Window expired' in output, got: {texts}"
-        )
+        assert any(
+            "Window expired" in t for t in texts
+        ), f"Expected 'Window expired' in output, got: {texts}"
 
     def test_expired_resets_at_does_not_show_nonsensical_hours(self):
         renderer = UsageRenderer()
@@ -152,9 +151,9 @@ class TestModelLimitExpired:
         }
         renderer._render_model_limit(content, model_data, "Opus")
         texts = _text_strings(content)
-        assert not any("Resets in:" in t for t in texts), (
-            f"Expected no countdown for expired window, got: {texts}"
-        )
+        assert not any(
+            "Resets in:" in t for t in texts
+        ), f"Expected no countdown for expired window, got: {texts}"
 
     def test_future_resets_at_shows_countdown(self):
         renderer = UsageRenderer()
@@ -165,9 +164,9 @@ class TestModelLimitExpired:
         }
         renderer._render_model_limit(content, model_data, "Sonnet")
         texts = _text_strings(content)
-        assert any("Resets in:" in t for t in texts), (
-            f"Expected countdown for future window, got: {texts}"
-        )
+        assert any(
+            "Resets in:" in t for t in texts
+        ), f"Expected countdown for future window, got: {texts}"
 
     def test_opus_model_expired(self):
         renderer = UsageRenderer()
@@ -178,6 +177,6 @@ class TestModelLimitExpired:
         }
         renderer._render_model_limit(content, model_data, "Opus")
         texts = _text_strings(content)
-        assert any("Window expired" in t for t in texts), (
-            f"Expected 'Window expired' for expired Opus window, got: {texts}"
-        )
+        assert any(
+            "Window expired" in t for t in texts
+        ), f"Expected 'Window expired' for expired Opus window, got: {texts}"

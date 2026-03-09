@@ -1,6 +1,6 @@
 """UI rendering for Code mode usage monitor"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from rich.progress import BarColumn, Progress, TextColumn
 from rich.table import Table
 from rich.text import Text
@@ -18,21 +18,35 @@ class UsageRenderer:
         last_update,
         pacemaker_status=None,
         weekly_limit_enabled=True,
+        activity_events=None,
     ):
         """Generate rich display for current usage"""
 
-        if error_message:
-            return Text(f"[red]⚠ {error_message}[/red]")
-
-        if not last_usage:
+        if not last_usage and not error_message:
             return Text("[yellow]Fetching usage data...[/yellow]")
 
         # Build display content
         content = []
 
+        if error_message:
+            content.append(Text.from_markup(f"[red]△ {error_message}[/red]"))
+
         # Profile information (at top)
         if last_profile:
             self._render_profile(content, last_profile)
+
+        # Activity line right below profile (Plan/Tier)
+        if activity_events is not None:
+            try:
+                activity_line = render_activity_line(activity_events)
+                content.append(activity_line)
+            except Exception as e:
+                import logging
+
+                logging.debug("Activity line render failed: %s", e)
+
+        if not last_usage:
+            return Group(*content) if content else Text("")
 
         # Five-hour limit
         if last_usage.get("five_hour"):
@@ -70,13 +84,17 @@ class UsageRenderer:
 
         # Account badges
         badges = []
+        raw_badges = []
         org_type = org.get("organization_type", "")
         if org_type == "claude_enterprise":
             badges.append("[bold blue]ENTERPRISE[/bold blue]")
+            raw_badges.append("ENTERPRISE")
         if account.get("has_claude_pro"):
             badges.append("[bold magenta]PRO[/bold magenta]")
+            raw_badges.append("PRO")
         if account.get("has_claude_max"):
             badges.append("[bold yellow]MAX[/bold yellow]")
+            raw_badges.append("MAX")
 
         # User and org info
         display_name = account.get("display_name", "")
@@ -99,11 +117,8 @@ class UsageRenderer:
         if org_name:
             # Show org name on one line (no "Org:" label, just icon and name)
             content.append(Text(f"🏢 {org_name}", style="bold"))
-            # Show plan badges on separate line if present
-            if badges:
-                content.append(Text.from_markup("📦 Plan: " + " ".join(badges)))
-        if rate_tier:
-            content.append(Text(f"⚡ Tier: {rate_tier}", style="dim"))
+        if raw_badges or rate_tier:
+            content.append(render_collapsed_plan_tier_line(raw_badges, rate_tier))
 
         if content:
             content.append(Text(""))  # spacing
@@ -156,8 +171,8 @@ class UsageRenderer:
             )
 
         if resets_at:
-            reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
-            now = datetime.utcnow()
+            reset_time = datetime.fromisoformat(resets_at)
+            now = datetime.now(timezone.utc)
             time_until = reset_time - now
 
             if time_until.total_seconds() > 0:
@@ -211,8 +226,8 @@ class UsageRenderer:
             )
 
         if resets_at:
-            reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
-            now = datetime.utcnow()
+            reset_time = datetime.fromisoformat(resets_at)
+            now = datetime.now(timezone.utc)
             time_until = reset_time - now
 
             if time_until.total_seconds() > 0:
@@ -290,8 +305,8 @@ class UsageRenderer:
         content.append(progress)
 
         if resets_at:
-            reset_time = datetime.fromisoformat(resets_at.replace("+00:00", ""))
-            now = datetime.utcnow()
+            reset_time = datetime.fromisoformat(resets_at)
+            now = datetime.now(timezone.utc)
             time_until = reset_time - now
 
             if time_until.total_seconds() > 0:
@@ -843,3 +858,127 @@ class UsageRenderer:
         centered_instruction = Text(" " * pad_left + ctrl_text, style="dim")
 
         return Group(table, centered_instruction)
+
+
+# Activity event groups: each tuple is a visual group separated by spaces.
+# Within a group, codes are separated by dots (·).
+_ACTIVITY_GROUPS = [
+    ("IV", "TD", "CC"),  # PreToolUse: intent, TDD, clean code
+    ("ST", "CX"),  # Stop: stop hook, context exhaustion
+    ("PA", "PL"),  # Pacing: pacing decision, API poll
+    ("LF",),  # PostToolUse: Langfuse push
+    ("SS", "SM"),  # Secrets: stored, masked
+    ("SE", "SA", "UP"),  # Session/Subagent/UserPrompt
+]
+
+# Color mapping per status
+_STATUS_STYLES = {
+    "green": "bold green",
+    "red": "bold red",
+    "blue": "bold blue",
+}
+_IDLE_STYLE = "dim"
+
+
+def render_activity_line(events: list) -> "Text":
+    """Render the real-time activity visualization line.
+
+    Displays 2-letter event codes grouped visually with dots within groups
+    and spaces between groups. Active events are colored by status;
+    inactive codes shown dim.
+
+    Visual: ▸ IV·TD·CC ST·CX PA·PL LF SS·SM SE·SA·UP
+
+    Args:
+        events: List of dicts with 'event_code' and 'status' keys,
+                as returned by get_recent_activity().
+
+    Returns:
+        Rich Text object with styled event codes.
+    """
+    from rich.text import Text
+
+    # Build lookup: event_code -> status for active events
+    active = {e["event_code"]: e["status"] for e in events}
+
+    text = Text()
+    text.append("▸ ", style=_IDLE_STYLE)
+
+    all_known_codes = _get_all_known_codes()
+    first_group = True
+    for group in _ACTIVITY_GROUPS:
+        # Only render codes that are known in the group
+        known_in_group = [code for code in group if code in all_known_codes]
+
+        if not known_in_group:
+            continue
+
+        if not first_group:
+            text.append(" ", style=_IDLE_STYLE)
+        first_group = False
+
+        for i, code in enumerate(known_in_group):
+            if i > 0:
+                text.append("·", style=_IDLE_STYLE)
+
+            if code in active:
+                status = active[code]
+                style = _STATUS_STYLES.get(status, _IDLE_STYLE)
+                text.append(code, style=style)
+            else:
+                text.append(code, style=_IDLE_STYLE)
+
+    return text
+
+
+def _get_all_known_codes() -> set:
+    """Return the set of all known 2-letter event codes."""
+    codes: set[str] = set()
+    for group in _ACTIVITY_GROUPS:
+        codes.update(group)
+    return codes
+
+
+def render_collapsed_plan_tier_line(plan_badges: list, rate_tier: str) -> "Text":
+    """Render collapsed Plan and Tier on one line.
+
+    Format: '📦 Plan: MAX  ⚡ 20x'
+    When only plan or only tier is present, renders what's available.
+
+    Args:
+        plan_badges: List of plan badge strings (e.g. ['MAX'], ['PRO'])
+        rate_tier: Rate tier string (e.g. '20x', '5x') or empty string
+
+    Returns:
+        Rich Text object with plan and tier on one line.
+    """
+    from rich.text import Text
+
+    text = Text()
+
+    has_plan = bool(plan_badges)
+    has_tier = bool(rate_tier)
+
+    if has_plan:
+        text.append("📦 Plan: ")
+        for i, badge in enumerate(plan_badges):
+            if i > 0:
+                text.append(" ")
+            # Map badge name to style
+            if badge == "MAX":
+                text.append(badge, style="bold yellow")
+            elif badge == "PRO":
+                text.append(badge, style="bold magenta")
+            elif badge == "ENTERPRISE":
+                text.append(badge, style="bold blue")
+            else:
+                text.append(badge, style="bold")
+
+    if has_plan and has_tier:
+        text.append("  ")
+
+    if has_tier:
+        text.append("⚡ ")
+        text.append(rate_tier, style="dim")
+
+    return text

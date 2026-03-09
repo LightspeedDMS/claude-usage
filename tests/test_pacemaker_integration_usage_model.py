@@ -28,10 +28,8 @@ import json
 import sqlite3
 import sys
 import time
-from datetime import datetime, timedelta
 from pathlib import Path
 
-import pytest
 
 # Add claude-usage src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -45,6 +43,7 @@ if str(_PM_SRC) not in sys.path:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_pm_dir(tmp_path: Path) -> Path:
     """Create a minimal ~/.claude-pace-maker structure."""
@@ -70,11 +69,16 @@ def _write_config(pm_dir: Path, enabled: bool = True) -> None:
 def _make_usage_model(db_path: str):
     """Instantiate UsageModel from pace-maker src."""
     from pacemaker.usage_model import UsageModel
+
     return UsageModel(db_path=db_path)
 
 
-def _write_usage_snapshot(pm_dir: Path, five_hour_util: float, seven_day_util: float,
-                           future_str: str = "2099-12-31T23:59:59") -> None:
+def _write_usage_snapshot(
+    pm_dir: Path,
+    five_hour_util: float,
+    seven_day_util: float,
+    future_str: str = "2099-12-31T23:59:59",
+) -> None:
     """Write a row into usage_snapshots — what the CURRENT (buggy) _get_latest_usage() reads.
 
     Used in BUG-1 test to prove old code would have returned the stale value.
@@ -83,7 +87,8 @@ def _write_usage_snapshot(pm_dir: Path, five_hour_util: float, seven_day_util: f
     conn = sqlite3.connect(str(db_path))
     conn.execute("PRAGMA journal_mode=WAL")
     # Create table if not already created by UsageModel init
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS usage_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp REAL,
@@ -94,11 +99,19 @@ def _write_usage_snapshot(pm_dir: Path, five_hour_util: float, seven_day_util: f
             session_id TEXT,
             created_at INTEGER DEFAULT (strftime('%s', 'now'))
         )
-    """)
+    """
+    )
     conn.execute(
         "INSERT INTO usage_snapshots (timestamp, five_hour_util, five_hour_resets_at, "
         "seven_day_util, seven_day_resets_at, session_id) VALUES (?, ?, ?, ?, ?, ?)",
-        (time.time(), five_hour_util, future_str, seven_day_util, future_str, "test-session"),
+        (
+            time.time(),
+            five_hour_util,
+            future_str,
+            seven_day_util,
+            future_str,
+            "test-session",
+        ),
     )
     conn.commit()
     conn.close()
@@ -119,6 +132,7 @@ def _make_reader(pm_dir: Path):
 # ---------------------------------------------------------------------------
 # Phase 8: _get_latest_usage() uses UsageModel
 # ---------------------------------------------------------------------------
+
 
 class TestGetLatestUsageUsesUsageModel:
     """_get_latest_usage() must use UsageModel.get_current_usage() as its data source.
@@ -146,10 +160,18 @@ class TestGetLatestUsageUsesUsageModel:
         model = _make_usage_model(str(pm_dir / "usage.db"))
 
         # Store real API data in api_cache (simulates last known value before 429)
-        model.store_api_response({
-            "five_hour": {"utilization": 52.0, "resets_at": "2099-01-01T12:00:00+00:00"},
-            "seven_day": {"utilization": 40.0, "resets_at": "2099-01-07T12:00:00+00:00"},
-        })
+        model.store_api_response(
+            {
+                "five_hour": {
+                    "utilization": 52.0,
+                    "resets_at": "2099-01-01T12:00:00+00:00",
+                },
+                "seven_day": {
+                    "utilization": 40.0,
+                    "resets_at": "2099-01-07T12:00:00+00:00",
+                },
+            }
+        )
 
         # Also write to usage_snapshots so old code path would return 52.0 too
         _write_usage_snapshot(pm_dir, five_hour_util=52.0, seven_day_util=40.0)
@@ -159,10 +181,18 @@ class TestGetLatestUsageUsesUsageModel:
         # Wait — actually enter_fallback snapshots the api_cache values as baselines.
         # So synthetic_5h starts at 52.0 too. Let us re-enter with lower baselines by
         # storing a lower api_response first then entering fallback.
-        model.store_api_response({
-            "five_hour": {"utilization": 30.0, "resets_at": "2099-01-01T12:00:00+00:00"},
-            "seven_day": {"utilization": 20.0, "resets_at": "2099-01-07T12:00:00+00:00"},
-        })
+        model.store_api_response(
+            {
+                "five_hour": {
+                    "utilization": 30.0,
+                    "resets_at": "2099-01-01T12:00:00+00:00",
+                },
+                "seven_day": {
+                    "utilization": 20.0,
+                    "resets_at": "2099-01-07T12:00:00+00:00",
+                },
+            }
+        )
         model.enter_fallback()
 
         # Now update usage_snapshots to still show the stale 52.0 (simulates race condition
@@ -176,7 +206,9 @@ class TestGetLatestUsageUsesUsageModel:
         # After fix: UsageModel.get_current_usage() detects fallback and returns synthetic.
         result = reader._get_latest_usage()
 
-        assert result is not None, "_get_latest_usage() must not return None during fallback"
+        assert (
+            result is not None
+        ), "_get_latest_usage() must not return None during fallback"
         # Old code reads usage_snapshots → 52.0 (BUG)
         # New code uses UsageModel → synthetic value starting at baseline 30.0
         assert result["five_hour_util"] != 52.0, (
@@ -191,10 +223,18 @@ class TestGetLatestUsageUsesUsageModel:
 
         # Set up UsageModel with API response in api_cache (no fallback entered)
         model = _make_usage_model(str(pm_dir / "usage.db"))
-        model.store_api_response({
-            "five_hour": {"utilization": 35.0, "resets_at": "2099-01-01T12:00:00+00:00"},
-            "seven_day": {"utilization": 20.0, "resets_at": "2099-01-07T12:00:00+00:00"},
-        })
+        model.store_api_response(
+            {
+                "five_hour": {
+                    "utilization": 35.0,
+                    "resets_at": "2099-01-01T12:00:00+00:00",
+                },
+                "seven_day": {
+                    "utilization": 20.0,
+                    "resets_at": "2099-01-07T12:00:00+00:00",
+                },
+            }
+        )
 
         reader = _make_reader(pm_dir)
         result = reader._get_latest_usage()
@@ -214,7 +254,9 @@ class TestGetLatestUsageUsesUsageModel:
         reader = _make_reader(pm_dir)
         result = reader._get_latest_usage()
 
-        assert result is None, "_get_latest_usage() must return None when no data available"
+        assert (
+            result is None
+        ), "_get_latest_usage() must return None when no data available"
 
     def test_get_latest_usage_result_has_required_keys(self, tmp_path):
         """Returned dict must have all keys that get_status() depends on."""
@@ -222,10 +264,18 @@ class TestGetLatestUsageUsesUsageModel:
         _write_config(pm_dir)
 
         model = _make_usage_model(str(pm_dir / "usage.db"))
-        model.store_api_response({
-            "five_hour": {"utilization": 25.0, "resets_at": "2099-01-01T12:00:00+00:00"},
-            "seven_day": {"utilization": 12.0, "resets_at": "2099-01-07T12:00:00+00:00"},
-        })
+        model.store_api_response(
+            {
+                "five_hour": {
+                    "utilization": 25.0,
+                    "resets_at": "2099-01-01T12:00:00+00:00",
+                },
+                "seven_day": {
+                    "utilization": 12.0,
+                    "resets_at": "2099-01-07T12:00:00+00:00",
+                },
+            }
+        )
 
         reader = _make_reader(pm_dir)
         result = reader._get_latest_usage()
@@ -239,9 +289,9 @@ class TestGetLatestUsageUsesUsageModel:
             "seven_day_util",
             "seven_day_resets_at",
         }
-        assert required_keys.issubset(result.keys()), (
-            f"Missing keys: {required_keys - result.keys()}"
-        )
+        assert required_keys.issubset(
+            result.keys()
+        ), f"Missing keys: {required_keys - result.keys()}"
 
 
 class TestIsFallbackActiveUsesUsageModel:
@@ -257,10 +307,18 @@ class TestIsFallbackActiveUsesUsageModel:
 
         # Initialize DB with normal state (no fallback entered, no fallback_state.json)
         model = _make_usage_model(str(pm_dir / "usage.db"))
-        model.store_api_response({
-            "five_hour": {"utilization": 10.0, "resets_at": "2099-01-01T12:00:00+00:00"},
-            "seven_day": {"utilization": 5.0, "resets_at": "2099-01-07T12:00:00+00:00"},
-        })
+        model.store_api_response(
+            {
+                "five_hour": {
+                    "utilization": 10.0,
+                    "resets_at": "2099-01-01T12:00:00+00:00",
+                },
+                "seven_day": {
+                    "utilization": 5.0,
+                    "resets_at": "2099-01-07T12:00:00+00:00",
+                },
+            }
+        )
 
         reader = _make_reader(pm_dir)
         assert reader.is_fallback_active() is False
@@ -274,16 +332,24 @@ class TestIsFallbackActiveUsesUsageModel:
         pm_dir = _make_pm_dir(tmp_path)
 
         model = _make_usage_model(str(pm_dir / "usage.db"))
-        model.store_api_response({
-            "five_hour": {"utilization": 30.0, "resets_at": "2099-01-01T12:00:00+00:00"},
-            "seven_day": {"utilization": 15.0, "resets_at": "2099-01-07T12:00:00+00:00"},
-        })
+        model.store_api_response(
+            {
+                "five_hour": {
+                    "utilization": 30.0,
+                    "resets_at": "2099-01-01T12:00:00+00:00",
+                },
+                "seven_day": {
+                    "utilization": 15.0,
+                    "resets_at": "2099-01-07T12:00:00+00:00",
+                },
+            }
+        )
         model.enter_fallback()
 
         # No fallback_state.json written — only DB state set
-        assert not (pm_dir / "fallback_state.json").exists(), (
-            "Precondition: test must NOT write fallback_state.json so we verify DB delegation"
-        )
+        assert not (
+            pm_dir / "fallback_state.json"
+        ).exists(), "Precondition: test must NOT write fallback_state.json so we verify DB delegation"
 
         reader = _make_reader(pm_dir)
         assert reader.is_fallback_active() is True

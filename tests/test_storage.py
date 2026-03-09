@@ -8,7 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from claude_usage.code_mode.storage import CodeAnalytics as UsageAnalytics, CodeStorage as UsageStorage
+from claude_usage.code_mode.storage import (
+    CodeAnalytics as UsageAnalytics,
+    CodeStorage as UsageStorage,
+)
 
 
 class TestUsageStorage:

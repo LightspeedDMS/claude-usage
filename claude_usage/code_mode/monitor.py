@@ -4,7 +4,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from rich.live import Live
 from rich.console import Console, Group
 from rich.text import Text
@@ -22,7 +22,7 @@ class CodeMonitor:
     """Monitor Claude Code account usage via the discovered API"""
 
     POLL_INTERVAL = 300  # seconds between API calls (5 minutes — same as pace-maker)
-    DISPLAY_REFRESH_INTERVAL = 10  # seconds between display refreshes
+    DISPLAY_REFRESH_INTERVAL = 1  # seconds between display refreshes
     CACHE_FRESHNESS_SECONDS = 360  # slightly above poll interval
 
     def __init__(self, credentials_path=None):
@@ -80,7 +80,7 @@ class CodeMonitor:
             model = UsageModel()
             snapshot = model.get_current_usage()
             if snapshot is not None:
-                age = (datetime.utcnow() - snapshot.timestamp).total_seconds()
+                age = (datetime.now(timezone.utc) - snapshot.timestamp).total_seconds()
                 if age <= self.CACHE_FRESHNESS_SECONDS:
                     self.last_usage = {
                         "five_hour": {
@@ -172,7 +172,7 @@ class CodeMonitor:
 
         if usage_data:
             self.last_usage = usage_data
-            self.last_update = datetime.now()
+            self.last_update = datetime.now(timezone.utc)
             self.error_message = None
             return True
         else:
@@ -285,6 +285,16 @@ class CodeMonitor:
             # Fetch Secrets metrics
             secrets_metrics = self.pacemaker_reader.get_secrets_metrics()
 
+        # Fetch activity events for the activity line (rendered inside main_display)
+        activity_events = None
+        if pacemaker_status:
+            try:
+                activity_events = self.pacemaker_reader.get_recent_activity(
+                    window_seconds=10
+                )
+            except Exception as e:
+                logging.debug("Activity events fetch failed: %s", e)
+
         main_display = self.renderer.render(
             self.error_message,
             self.last_usage,
@@ -292,6 +302,7 @@ class CodeMonitor:
             self.last_update,
             pacemaker_status,
             weekly_limit_enabled=weekly_limit_enabled,
+            activity_events=activity_events,
         )
 
         # Add bottom section with blockage stats if pacemaker is available
@@ -304,6 +315,7 @@ class CodeMonitor:
                 langfuse_metrics=langfuse_metrics,
                 secrets_metrics=secrets_metrics,
             )
+
             return Group(main_display, bottom_section)
 
         instruction = Text("Press Ctrl+C to stop", style="dim")
@@ -312,7 +324,7 @@ class CodeMonitor:
     def run(self):
         """Main run loop for Code mode monitoring.
 
-        Display refreshes every DISPLAY_REFRESH_INTERVAL (10s).
+        Display refreshes every DISPLAY_REFRESH_INTERVAL (1s).
         API polling happens every POLL_INTERVAL (300s).
         These are decoupled so the display stays responsive.
         """
