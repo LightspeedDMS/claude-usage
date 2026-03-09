@@ -57,13 +57,16 @@ class UsageRenderer:
                     "five_hour_limit_enabled", True
                 )
             self._render_five_hour_limit(
-                content, last_usage["five_hour"], five_hour_limit_enabled
+                content,
+                last_usage["five_hour"],
+                five_hour_limit_enabled,
+                pacemaker_status,
             )
 
         # Seven-day limit (always show if data available)
         if last_usage.get("seven_day"):
             self._render_seven_day_limit(
-                content, last_usage["seven_day"], weekly_limit_enabled
+                content, last_usage["seven_day"], weekly_limit_enabled, pacemaker_status
             )
 
         # Model-specific 7-day limits (Sonnet, Opus) if available
@@ -124,13 +127,16 @@ class UsageRenderer:
         if content:
             content.append(Text(""))  # spacing
 
-    def _render_five_hour_limit(self, content, five_hour, five_hour_limit_enabled=True):
+    def _render_five_hour_limit(
+        self, content, five_hour, five_hour_limit_enabled=True, pacemaker_status=None
+    ):
         """Render five-hour usage display
 
         Args:
             content: List to append rendered content to
             five_hour: Five-hour usage data
             five_hour_limit_enabled: Whether five-hour throttling is enabled (affects display note only)
+            pacemaker_status: Optional pace-maker status dict (for coefficient display)
         """
         utilization = five_hour.get("utilization", 0)
         resets_at = five_hour.get("resets_at", "")
@@ -160,14 +166,21 @@ class UsageRenderer:
         content.append(progress)
 
         # 5-Hour limiter status (always shown, like other status indicators)
+        coeffs = ""
+        if pacemaker_status:
+            c5h = pacemaker_status.get("coefficients_5h")
+            if c5h:
+                coeffs = f" (5x:{c5h['5x']:.4f} 20x:{c5h['20x']:.4f})"
         if five_hour_limit_enabled:
             content.append(
-                Text.from_markup("5-Hour Limiter: [green]enabled[/green]", style="dim")
+                Text.from_markup(
+                    f"5-Hour Limiter: [green]enabled[/green]{coeffs}", style="dim"
+                )
             )
         else:
             content.append(
                 Text.from_markup(
-                    "5-Hour Limiter: [yellow]disabled[/yellow]", style="dim"
+                    f"5-Hour Limiter: [yellow]disabled[/yellow]{coeffs}", style="dim"
                 )
             )
 
@@ -183,13 +196,16 @@ class UsageRenderer:
             else:
                 content.append(Text("⏰ Window expired", style="cyan"))
 
-    def _render_seven_day_limit(self, content, seven_day, weekly_limit_enabled=True):
+    def _render_seven_day_limit(
+        self, content, seven_day, weekly_limit_enabled=True, pacemaker_status=None
+    ):
         """Render seven-day usage display
 
         Args:
             content: List to append rendered content to
             seven_day: Seven-day usage data
             weekly_limit_enabled: Whether weekly throttling is enabled (affects display note only)
+            pacemaker_status: Optional pace-maker status dict (for coefficient display)
         """
         utilization = seven_day.get("utilization", 0)
         resets_at = seven_day.get("resets_at", "")
@@ -218,11 +234,22 @@ class UsageRenderer:
         content.append(Text(""))  # spacing
         content.append(progress)
 
-        # Throttling disabled note below progress bar
-        if not weekly_limit_enabled:
+        # 7-Day limiter status (always shown, matching 5-hour pattern)
+        coeffs = ""
+        if pacemaker_status:
+            c7d = pacemaker_status.get("coefficients_7d")
+            if c7d:
+                coeffs = f" (5x:{c7d['5x']:.4f} 20x:{c7d['20x']:.4f})"
+        if weekly_limit_enabled:
             content.append(
                 Text.from_markup(
-                    "7-Day Limiter: [yellow]disabled[/yellow]", style="dim"
+                    f"7-Day Limiter: [green]enabled[/green]{coeffs}", style="dim"
+                )
+            )
+        else:
+            content.append(
+                Text.from_markup(
+                    f"7-Day Limiter: [yellow]disabled[/yellow]{coeffs}", style="dim"
                 )
             )
 

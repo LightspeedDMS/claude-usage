@@ -231,6 +231,8 @@ class PaceMakerReader:
                 ),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
+                "coefficients_5h": None,
+                "coefficients_7d": None,
             }
 
         # Calculate pacing decision using pace-maker's algorithm
@@ -298,6 +300,36 @@ class PaceMakerReader:
                 if decision.get("error"):
                     status_result["error"] = decision["error"]
 
+            # Fetch coefficients (calibrated preferred, fallback to defaults)
+            try:
+                from pacemaker.fallback import _DEFAULT_TOKEN_COSTS
+                from pacemaker.usage_model import UsageModel
+
+                coeff_5h_5x = _DEFAULT_TOKEN_COSTS["5x"]["coefficient_5h"]
+                coeff_5h_20x = _DEFAULT_TOKEN_COSTS["20x"]["coefficient_5h"]
+                coeff_7d_5x = _DEFAULT_TOKEN_COSTS["5x"]["coefficient_7d"]
+                coeff_7d_20x = _DEFAULT_TOKEN_COSTS["20x"]["coefficient_7d"]
+
+                model = UsageModel(db_path=str(self.db_path))
+                cal_5x = model._get_calibrated_coefficients("5x")
+                if cal_5x is not None:
+                    coeff_5h_5x, coeff_7d_5x = cal_5x
+                cal_20x = model._get_calibrated_coefficients("20x")
+                if cal_20x is not None:
+                    coeff_5h_20x, coeff_7d_20x = cal_20x
+
+                status_result["coefficients_5h"] = {
+                    "5x": coeff_5h_5x,
+                    "20x": coeff_5h_20x,
+                }
+                status_result["coefficients_7d"] = {
+                    "5x": coeff_7d_5x,
+                    "20x": coeff_7d_20x,
+                }
+            except Exception as e:
+                # Coefficients are optional display data; log for debugging but don't fail
+                logging.debug("Failed to fetch pacemaker coefficients: %s", e)
+
             # Add fallback mode indicators (Story #38)
             fallback_active = self.is_fallback_active()
             status_result["fallback_mode"] = fallback_active
@@ -329,6 +361,8 @@ class PaceMakerReader:
                 ),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
+                "coefficients_5h": None,
+                "coefficients_7d": None,
             }
 
     def _read_config(self) -> Optional[Dict[str, Any]]:
