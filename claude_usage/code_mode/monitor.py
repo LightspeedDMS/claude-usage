@@ -81,7 +81,8 @@ class CodeMonitor:
             snapshot = model.get_current_usage()
             if snapshot is not None:
                 age = (datetime.now(timezone.utc) - snapshot.timestamp).total_seconds()
-                if age <= self.CACHE_FRESHNESS_SECONDS:
+                # Accept stale data if we have nothing to show — always display bars
+                if age <= self.CACHE_FRESHNESS_SECONDS or self.last_usage is None:
                     self.last_usage = {
                         "five_hour": {
                             "utilization": snapshot.five_hour_util,
@@ -177,7 +178,8 @@ class CodeMonitor:
             return True
         else:
             self.error_message = error
-            return False
+            # Still return True if we have stale data — always show progress bars
+            return self.last_usage is not None
 
     def fetch_profile(self):
         """Fetch profile data from Claude Code API"""
