@@ -77,7 +77,8 @@ class CodeMonitor:
 
             from pacemaker.usage_model import UsageModel
 
-            model = UsageModel()
+            db_path = getattr(self.pacemaker_reader, "db_path", None)
+            model = UsageModel(db_path=str(db_path)) if db_path else UsageModel()
             snapshot = model.get_current_usage()
             if snapshot is not None:
                 # UsageModel may return naive timestamps — assume UTC
@@ -105,6 +106,25 @@ class CodeMonitor:
                             ),
                         },
                     }
+                    # Merge per-model fields from raw API response in api_cache
+                    # (regression fix: cee8bbb dropped seven_day_sonnet/opus)
+                    try:
+                        cache = model.get_api_cache()
+                        if cache and cache.get("raw_response"):
+                            raw = cache["raw_response"]
+                            for key in (
+                                "seven_day_sonnet",
+                                "seven_day_opus",
+                                "seven_day_oauth_apps",
+                                "seven_day_cowork",
+                                "extra_usage",
+                            ):
+                                if raw.get(key) is not None:
+                                    self.last_usage[key] = raw[key]
+                    except Exception as e:
+                        logging.debug(
+                            f"Failed to merge per-model fields from api_cache: {e}"
+                        )
                     self.last_update = ts
                     self.error_message = None
                     return True
