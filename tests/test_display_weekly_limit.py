@@ -44,7 +44,6 @@ class TestDisplayWeeklyLimit(unittest.TestCase):
             "deviation_percent": 33.0,
             "should_throttle": True,
             "delay_seconds": 10,
-            "algorithm": "adaptive",
             "strategy": "weekend",
         }
 
@@ -96,7 +95,6 @@ class TestDisplayWeeklyLimit(unittest.TestCase):
             "deviation_percent": 15.0,
             "should_throttle": True,
             "delay_seconds": 10,
-            "algorithm": "adaptive",
             "strategy": "preload",
         }
 
@@ -143,7 +141,6 @@ class TestDisplayWeeklyLimit(unittest.TestCase):
             "deviation_percent": 15.0,
             "should_throttle": False,
             "delay_seconds": 0,
-            "algorithm": "adaptive",
             "strategy": "preload",
         }
 
@@ -190,7 +187,6 @@ class TestDisplayWeeklyLimit(unittest.TestCase):
             "deviation_percent": 15.0,
             "should_throttle": False,
             "delay_seconds": 0,
-            "algorithm": "adaptive",
             "strategy": "preload",
         }
 

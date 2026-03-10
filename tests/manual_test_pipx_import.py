@@ -111,7 +111,6 @@ def test_full_integration():
             print("  ✓ Successfully imported and got status")
             print(f"     Has data: {status.get('has_data', False)}")
             if status.get("has_data"):
-                print(f"     Algorithm: {status.get('algorithm', 'unknown')}")
                 print(f"     Should throttle: {status.get('should_throttle', False)}")
                 if status.get("should_throttle"):
                     print(f"     Delay: {status.get('delay_seconds', 0)}s")

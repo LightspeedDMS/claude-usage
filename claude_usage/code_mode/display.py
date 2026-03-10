@@ -606,25 +606,6 @@ class UsageRenderer:
                     )
                 )
 
-        # Algorithm status
-        algorithm = pacemaker_status.get("algorithm", "unknown")
-        enabled = pacemaker_status.get("enabled", False)
-        if enabled:
-            left_lines.append(
-                self._fmt_kv(
-                    "Algorithm:",
-                    algorithm,
-                    f"[green]{algorithm}[/green]",
-                    status_col_width,
-                )
-            )
-        else:
-            left_lines.append(
-                self._fmt_kv(
-                    "Algorithm:", "inactive", "[dim]inactive[/dim]", status_col_width
-                )
-            )
-
         # Tempo status
         tempo_enabled = pacemaker_status.get("tempo_enabled", True)
         if tempo_enabled:

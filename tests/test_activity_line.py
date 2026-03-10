@@ -410,7 +410,6 @@ class TestMonitorActivityLineIntegration:
             "constrained_window": "5-hour",
             "should_throttle": False,
             "delay_seconds": 0,
-            "algorithm": "adaptive",
             "weekly_limit_enabled": True,
             "five_hour_limit_enabled": True,
             "tempo_enabled": True,

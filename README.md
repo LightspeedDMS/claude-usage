@@ -131,7 +131,6 @@ Press Ctrl+C to stop
 │ 5-Hour Target: ████████████░░░░░░░░ 62%                 │
 │ Deviation: +15.2% (over budget)                         │
 │ ⏱️  Next delay: 45s per tool use                        │
-│ Algorithm: adaptive/preload                             │
 │ Tempo: enabled                                          │
 │                                                          │
 │ Updated: 21:04:36                                       │
@@ -282,7 +281,7 @@ Optional integration with [Claude Pace Maker](https://github.com/LightspeedDMS/c
 - Reads throttling status from Pace-Maker database and config
 - Displays real-time throttling decisions and delay timings
 - Shows deviation from target pace and constrained window
-- Supports both adaptive and legacy pacing algorithms
+- Displays real-time adaptive pacing status
 - **Stale Data Warning**: Displays warning when pace-maker usage data is outdated
 
 **Resilient Fallback Mode:**
@@ -293,7 +292,6 @@ Optional integration with [Claude Pace Maker](https://github.com/LightspeedDMS/c
 - No manual intervention needed: the monitor always shows the best available data
 
 **Pacing Status Column:**
-- Algorithm status (adaptive/legacy)
 - Tempo tracking (on/off)
 - Subagent reminder (on/off)
 - Intent validation (on/off)

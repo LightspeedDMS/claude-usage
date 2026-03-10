@@ -33,7 +33,7 @@ class TestTwoColumnLayout(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tempo_enabled": True,
             "intent_validation_enabled": False,
             "subagent_reminder_enabled": True,
@@ -54,7 +54,7 @@ class TestTwoColumnLayout(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tempo_enabled": True,
             "intent_validation_enabled": True,
             "subagent_reminder_enabled": False,
@@ -62,7 +62,6 @@ class TestTwoColumnLayout(unittest.TestCase):
         blockage_stats = {"Intent Validation": 0, "Total": 0}
         result = self.renderer.render_bottom_section(pacemaker_status, blockage_stats)
         output = self._render_to_text(result)
-        self.assertIn("Algorithm", output)
         self.assertIn("Tempo", output)
         self.assertIn("Intent", output)
 
@@ -99,7 +98,7 @@ class TestBlockageStatsUnavailable(unittest.TestCase):
 
     def test_render_bottom_section_shows_unavailable_when_stats_none(self):
         """Test that right column shows '(unavailable)' when blockage_stats is None (AC5)"""
-        pacemaker_status = {"enabled": True, "has_data": True, "algorithm": "adaptive"}
+        pacemaker_status = {"enabled": True, "has_data": True}
         result = self.renderer.render_bottom_section(
             pacemaker_status, blockage_stats=None
         )
@@ -125,7 +124,7 @@ class TestTerminalWidthHandling(unittest.TestCase):
 
     def test_wide_terminal_shows_two_columns(self):
         """Test that terminals >= 60 chars show two-column layout (AC6)"""
-        pacemaker_status = {"enabled": True, "has_data": True, "algorithm": "adaptive"}
+        pacemaker_status = {"enabled": True, "has_data": True}
         blockage_stats = {"Intent Validation": 5, "Total": 5}
         result = self.renderer.render_bottom_section(pacemaker_status, blockage_stats)
         output = self._render_to_text(result, width=80)
@@ -171,7 +170,7 @@ class TestMonitorIntegration(unittest.TestCase):
             mock_pacemaker.get_status.return_value = {
                 "enabled": True,
                 "has_data": True,
-                "algorithm": "adaptive",
+    
                 "tempo_enabled": True,
                 "intent_validation_enabled": False,
                 "subagent_reminder_enabled": True,
@@ -246,7 +245,7 @@ class TestMonitorIntegration(unittest.TestCase):
             mock_pacemaker.get_status.return_value = {
                 "enabled": True,
                 "has_data": True,
-                "algorithm": "adaptive",
+    
                 "tdd_enabled": True,
                 "preferred_subagent_model": "auto",
                 "clean_code_rules_count": 17,

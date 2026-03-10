@@ -61,7 +61,7 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
                 "time_elapsed_pct": 50.0,
             },
             "deviation_percent": -4.0,  # OLD WRONG VALUE (from pm_status)
-            "algorithm": "adaptive",
+
             "strategy": "gradual",
         }
 
@@ -127,7 +127,7 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
                 "time_elapsed_pct": 40.0,
             },
             "deviation_percent": -20.0,  # OLD VALUE (from target)
-            "algorithm": "adaptive",
+
             "strategy": "none",
         }
 
@@ -188,7 +188,7 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
                 "time_elapsed_pct": 50.0,
             },
             "deviation_percent": -5.0,  # Based on stale 90%
-            "algorithm": "adaptive",
+
             "strategy": "gradual",
         }
 
@@ -241,7 +241,7 @@ class TestDeviationFromSafeAllowance(unittest.TestCase):
                 "time_elapsed_pct": 50.0,
             },
             "deviation_percent": 1.0,  # OLD calculation
-            "algorithm": "adaptive",
+
             "strategy": "aggressive",
         }
 

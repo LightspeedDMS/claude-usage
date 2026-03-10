@@ -35,7 +35,7 @@ class TestMonitorLangfuseIntegration(unittest.TestCase):
         mock_reader.get_status.return_value = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
         }
         mock_reader.get_langfuse_status.return_value = True  # Langfuse enabled
         mock_reader.get_langfuse_metrics.return_value = {
@@ -71,7 +71,7 @@ class TestMonitorLangfuseIntegration(unittest.TestCase):
         mock_reader.get_status.return_value = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
         }
         mock_reader.get_langfuse_status.return_value = True
         mock_reader.get_langfuse_metrics.return_value = {
@@ -107,7 +107,7 @@ class TestMonitorLangfuseIntegration(unittest.TestCase):
         mock_reader.get_status.return_value = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
         }
         mock_reader.get_langfuse_status.return_value = True  # Langfuse enabled
         mock_reader.get_langfuse_metrics.return_value = None
@@ -152,7 +152,7 @@ class TestMonitorLangfuseIntegration(unittest.TestCase):
         mock_reader.get_status.return_value = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
         }
         mock_reader.get_langfuse_status.return_value = False
         expected_metrics = {
@@ -227,7 +227,7 @@ class TestMonitorLangfuseIntegration(unittest.TestCase):
         mock_reader.get_status.return_value = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
         }
         mock_reader.get_langfuse_status.return_value = False
         mock_reader.get_langfuse_metrics.return_value = None  # No metrics available

@@ -33,7 +33,7 @@ class TestLangfuseDisplayIntegration(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tempo_enabled": True,
             "subagent_reminder_enabled": True,
             "intent_validation_enabled": False,
@@ -53,7 +53,7 @@ class TestLangfuseDisplayIntegration(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tempo_enabled": True,
             "subagent_reminder_enabled": True,
             "intent_validation_enabled": False,
@@ -73,7 +73,7 @@ class TestLangfuseDisplayIntegration(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tempo_enabled": True,
             "subagent_reminder_enabled": True,
             "intent_validation_enabled": False,
@@ -104,7 +104,7 @@ class TestLangfuseDisplayIntegration(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tempo_enabled": True,
             "subagent_reminder_enabled": True,
             "intent_validation_enabled": False,
@@ -127,7 +127,7 @@ class TestLangfuseDisplayIntegration(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tempo_enabled": True,
             "subagent_reminder_enabled": True,
             "intent_validation_enabled": False,
@@ -159,7 +159,7 @@ class TestLangfuseDisplayIntegration(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tempo_enabled": True,
             "subagent_reminder_enabled": True,
             "intent_validation_enabled": False,
@@ -179,7 +179,7 @@ class TestLangfuseDisplayIntegration(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tempo_enabled": True,
             "subagent_reminder_enabled": True,
             "intent_validation_enabled": False,

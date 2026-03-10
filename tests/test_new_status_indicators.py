@@ -37,7 +37,7 @@ class TestNewStatusIndicatorsDisplay(unittest.TestCase):
         pacemaker_status = {
             "enabled": True,
             "has_data": True,
-            "algorithm": "adaptive",
+
             "tdd_enabled": True,
             "preferred_subagent_model": "auto",
             "clean_code_rules_count": DEFAULT_CLEAN_CODE_RULES_COUNT,
@@ -435,9 +435,24 @@ class TestNewStatusFieldsIntegration(unittest.TestCase):
                 "deviation_percent": 5.0,
                 "should_throttle": False,
                 "delay_seconds": 0,
-                "algorithm": "adaptive",
+    
                 "strategy": "normal",
             }
+
+            # Mock pacemaker.usage_model so _get_latest_usage returns data
+            from datetime import datetime, timedelta, timezone
+            mock_snapshot = MagicMock()
+            mock_snapshot.timestamp = datetime(2025, 11, 13, 23, 0, 0)
+            mock_snapshot.five_hour_util = 75.0
+            mock_snapshot.five_hour_resets_at = datetime.now(timezone.utc) + timedelta(hours=2)
+            mock_snapshot.seven_day_util = 60.0
+            mock_snapshot.seven_day_resets_at = datetime.now(timezone.utc) + timedelta(days=3)
+            mock_snapshot.is_synthetic = False
+
+            mock_usage_model_cls = MagicMock()
+            mock_usage_model_cls.return_value.get_current_usage.return_value = mock_snapshot
+            mock_usage_model_module = MagicMock()
+            mock_usage_model_module.UsageModel = mock_usage_model_cls
 
             # Mock both pacemaker and pacemaker.pacing_engine modules
             with patch.dict(
@@ -445,6 +460,7 @@ class TestNewStatusFieldsIntegration(unittest.TestCase):
                 {
                     "pacemaker": MagicMock(),
                     "pacemaker.pacing_engine": mock_pacing_engine_module,
+                    "pacemaker.usage_model": mock_usage_model_module,
                     "pacemaker.clean_code_rules": MagicMock(
                         get_default_rules=MagicMock(
                             return_value=[

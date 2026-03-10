@@ -57,18 +57,6 @@ class TestRenderBottomSectionLeftColumn:
     def test_pacing_status_header_present(self):
         assert "Pacing Status" in self._render(_make_pacemaker_status())
 
-    # ---- Algorithm ----
-
-    def test_algorithm_shown_when_enabled(self):
-        rendered = self._render(
-            _make_pacemaker_status(enabled=True, algorithm="adaptive")
-        )
-        assert "Algorithm" in rendered
-        assert "adaptive" in rendered
-
-    def test_algorithm_inactive_when_disabled(self):
-        assert "inactive" in self._render(_make_pacemaker_status(enabled=False))
-
     # ---- Tempo ----
 
     def test_tempo_on(self):

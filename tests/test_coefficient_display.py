@@ -55,7 +55,6 @@ def _make_mock_get_status_environment():
         "deviation_percent": -5.0,
         "should_throttle": False,
         "delay_seconds": 0,
-        "algorithm": "adaptive",
         "strategy": "normal",
     }
     mock_pacing_engine = MagicMock()

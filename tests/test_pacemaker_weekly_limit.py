@@ -106,7 +106,7 @@ class TestPaceMakerReaderWeeklyLimit(unittest.TestCase):
             "deviation_percent": 15.0,
             "should_throttle": True,
             "delay_seconds": 10,
-            "algorithm": "adaptive",
+
             "strategy": "preload",
         }
 
@@ -143,7 +143,7 @@ class TestPaceMakerReaderWeeklyLimit(unittest.TestCase):
             "deviation_percent": 15.0,
             "should_throttle": True,
             "delay_seconds": 10,
-            "algorithm": "adaptive",
+
             "strategy": "preload",
         }
 
@@ -189,7 +189,7 @@ class TestPaceMakerReaderWeeklyLimit(unittest.TestCase):
             "deviation_percent": 15.0,
             "should_throttle": True,
             "delay_seconds": 10,
-            "algorithm": "adaptive",
+
             "strategy": "preload",
         }
 

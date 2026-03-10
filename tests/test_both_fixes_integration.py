@@ -59,7 +59,7 @@ class TestBothFixesIntegration(unittest.TestCase):
                 "time_elapsed_pct": 0.0,
             },
             "deviation_percent": -5.0,  # OLD WRONG: from target (5% - 10% = -5%)
-            "algorithm": "adaptive",
+
             "strategy": "none",
         }
 
@@ -122,7 +122,7 @@ class TestBothFixesIntegration(unittest.TestCase):
                 "time_elapsed_pct": 0.0,
             },
             "deviation_percent": 0.0,  # OLD WRONG: based on stale data
-            "algorithm": "adaptive",
+
             "strategy": "minimal",
         }
 
@@ -186,7 +186,7 @@ class TestBothFixesIntegration(unittest.TestCase):
                 "time_elapsed_pct": 11.67,  # 35/300 minutes
             },
             "deviation_percent": -2.0,  # OLD: based on stale util
-            "algorithm": "adaptive",
+
             "strategy": "none",
         }
 
