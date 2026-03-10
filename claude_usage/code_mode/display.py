@@ -170,7 +170,23 @@ class UsageRenderer:
         if pacemaker_status:
             c5h = pacemaker_status.get("coefficients_5h")
             if c5h:
-                coeffs = f" (5x:{c5h['5x']:.4f} 20x:{c5h['20x']:.4f})"
+                overridden_5x = pacemaker_status.get(
+                    "coefficients_5x_overridden", False
+                )
+                overridden_20x = pacemaker_status.get(
+                    "coefficients_20x_overridden", False
+                )
+                val_5x = (
+                    f"[green]{c5h['5x']:.4f}[/green]"
+                    if overridden_5x
+                    else f"{c5h['5x']:.4f}"
+                )
+                val_20x = (
+                    f"[green]{c5h['20x']:.4f}[/green]"
+                    if overridden_20x
+                    else f"{c5h['20x']:.4f}"
+                )
+                coeffs = f" (5x:{val_5x} 20x:{val_20x})"
         if five_hour_limit_enabled:
             content.append(
                 Text.from_markup(
@@ -239,7 +255,23 @@ class UsageRenderer:
         if pacemaker_status:
             c7d = pacemaker_status.get("coefficients_7d")
             if c7d:
-                coeffs = f" (5x:{c7d['5x']:.4f} 20x:{c7d['20x']:.4f})"
+                overridden_5x = pacemaker_status.get(
+                    "coefficients_5x_overridden", False
+                )
+                overridden_20x = pacemaker_status.get(
+                    "coefficients_20x_overridden", False
+                )
+                val_5x = (
+                    f"[green]{c7d['5x']:.4f}[/green]"
+                    if overridden_5x
+                    else f"{c7d['5x']:.4f}"
+                )
+                val_20x = (
+                    f"[green]{c7d['20x']:.4f}[/green]"
+                    if overridden_20x
+                    else f"{c7d['20x']:.4f}"
+                )
+                coeffs = f" (5x:{val_5x} 20x:{val_20x})"
         if weekly_limit_enabled:
             content.append(
                 Text.from_markup(

@@ -361,6 +361,9 @@ Contributions welcome! Please open an issue or submit a pull request.
 
 ## Changelog
 
+### v2.2.0 (March 2026)
+- **Green Coefficient Highlighting**: Overridden pacing coefficients now display in green instead of grey, making it easy to distinguish calibrated values from defaults at a glance
+
 ### v1.4.0 (March 2026)
 - **Resilient Fallback Integration**: Monitor reads from `UsageModel.get_current_usage()` — automatically displays synthetic utilization estimates during API 429 outages
 - **Right-Aligned Status Values**: Both Pacing Status and Blockages columns now right-align values to column boundary for improved readability

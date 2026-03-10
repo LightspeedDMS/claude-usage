@@ -466,3 +466,277 @@ class TestRenderPassesPacemakerStatusToLimiters:
         )
         assert "5-Hour Usage" in rendered
         assert "5x:" not in rendered
+
+
+# ===========================================================================
+# Helper for override-flag tests (Story #4)
+# ===========================================================================
+
+
+def _make_pm_status_with_override_flags(
+    coeff_5h_5x: float = 0.0075,
+    coeff_5h_20x: float = 0.001875,
+    coeff_7d_5x: float = 0.0011,
+    coeff_7d_20x: float = 0.000275,
+    overridden_5x: bool = False,
+    overridden_20x: bool = False,
+    **kwargs,
+) -> dict:
+    """Build a pacemaker_status dict with both coefficients and override flags."""
+    status = _make_pacemaker_status(**kwargs)
+    status["coefficients_5h"] = {"5x": coeff_5h_5x, "20x": coeff_5h_20x}
+    status["coefficients_7d"] = {"5x": coeff_7d_5x, "20x": coeff_7d_20x}
+    status["coefficients_5x_overridden"] = overridden_5x
+    status["coefficients_20x_overridden"] = overridden_20x
+    return status
+
+
+# ===========================================================================
+# Section 4: get_status() returns override flags (Story #4)
+# ===========================================================================
+
+
+class TestGetStatusIncludesOverrideFlags:
+    """get_status() must include coefficients_5x_overridden and coefficients_20x_overridden flags."""
+
+    def test_override_flags_false_when_no_calibration(self):
+        """Both override flags are False when no calibrated coefficients exist."""
+        reader = _make_reader_with_data()
+        mock_pe, mock_fb, mock_umc = _make_mock_get_status_environment()
+
+        with (
+            patch.object(reader, "is_installed", return_value=True),
+            patch.object(reader, "_read_config", return_value=_STANDARD_CONFIG),
+            patch.object(reader, "_get_latest_usage", return_value=_STANDARD_USAGE),
+            patch.object(reader, "is_fallback_active", return_value=False),
+        ):
+            result = _call_get_status_with_mocks(reader, mock_pe, mock_fb, mock_umc)
+
+        assert result is not None
+        assert result["coefficients_5x_overridden"] is False
+        assert result["coefficients_20x_overridden"] is False
+
+    def test_5x_overridden_true_when_calibrated(self):
+        """coefficients_5x_overridden is True when calibrated 5x coefficients exist."""
+        reader = _make_reader_with_data()
+        mock_pe, mock_fb, mock_umc = _make_mock_get_status_environment()
+
+        mock_instance = mock_umc.return_value
+
+        def calibrated_side_effect(tier):
+            return (0.0088, 0.0013) if tier == "5x" else None
+
+        mock_instance._get_calibrated_coefficients.side_effect = calibrated_side_effect
+
+        with (
+            patch.object(reader, "is_installed", return_value=True),
+            patch.object(reader, "_read_config", return_value=_STANDARD_CONFIG),
+            patch.object(reader, "_get_latest_usage", return_value=_STANDARD_USAGE),
+            patch.object(reader, "is_fallback_active", return_value=False),
+        ):
+            result = _call_get_status_with_mocks(reader, mock_pe, mock_fb, mock_umc)
+
+        assert result is not None
+        assert result["coefficients_5x_overridden"] is True
+        assert result["coefficients_20x_overridden"] is False
+
+    def test_20x_overridden_true_when_calibrated(self):
+        """coefficients_20x_overridden is True when calibrated 20x coefficients exist."""
+        reader = _make_reader_with_data()
+        mock_pe, mock_fb, mock_umc = _make_mock_get_status_environment()
+
+        mock_instance = mock_umc.return_value
+
+        def calibrated_side_effect(tier):
+            return (0.0022, 0.00035) if tier == "20x" else None
+
+        mock_instance._get_calibrated_coefficients.side_effect = calibrated_side_effect
+
+        with (
+            patch.object(reader, "is_installed", return_value=True),
+            patch.object(reader, "_read_config", return_value=_STANDARD_CONFIG),
+            patch.object(reader, "_get_latest_usage", return_value=_STANDARD_USAGE),
+            patch.object(reader, "is_fallback_active", return_value=False),
+        ):
+            result = _call_get_status_with_mocks(reader, mock_pe, mock_fb, mock_umc)
+
+        assert result is not None
+        assert result["coefficients_5x_overridden"] is False
+        assert result["coefficients_20x_overridden"] is True
+
+    def test_override_flags_false_when_no_usage_data(self):
+        """When no usage data, override flags are False in result dict."""
+        reader = _make_reader_with_data()
+
+        with (
+            patch.object(reader, "is_installed", return_value=True),
+            patch.object(reader, "_read_config", return_value=_STANDARD_CONFIG),
+            patch.object(reader, "_get_latest_usage", return_value=None),
+        ):
+            result = reader.get_status()
+
+        assert result is not None
+        assert result.get("coefficients_5x_overridden") is False
+        assert result.get("coefficients_20x_overridden") is False
+
+
+# ===========================================================================
+# Helper for display coloring tests (Story #4)
+# ===========================================================================
+
+
+def _render_display(r, pm_status, usage=None, **render_kwargs):
+    """Render UsageRenderer to captured ANSI string for inspection.
+
+    Uses force_terminal=True so Rich emits real ANSI escape codes (e.g. ESC[32m
+    for green).  This differs from _render_to_str which strips all markup and is
+    only suitable for plain-text content assertions.
+    """
+    from io import StringIO
+
+    from rich.console import Console
+
+    if usage is None:
+        usage = _make_usage()
+    buf = StringIO()
+    console = Console(file=buf, width=120, force_terminal=True, highlight=False)
+    rendered = r.render(
+        error_message=None,
+        last_usage=usage,
+        last_profile=None,
+        last_update=None,
+        pacemaker_status=pm_status,
+        **render_kwargs,
+    )
+    with console.capture() as capture:
+        console.print(rendered)
+    return capture.get()
+
+
+# ===========================================================================
+# Section 5: Display uses green for overridden 5-hour coefficients (Story #4)
+# ===========================================================================
+
+
+def _coeff_line(rendered: str, value: str) -> str:
+    """Return the raw ANSI line that contains the given coefficient value string.
+
+    Matches any limiter line that contains both the value and '5x:'.
+    For limiter-specific matching use _coeff_line_7d.
+    """
+    for line in rendered.split("\n"):
+        if value in line and "5x:" in line:
+            return line
+    return ""
+
+
+def _coeff_line_7d(rendered: str, value: str) -> str:
+    """Return the 7-Day Limiter ANSI line that contains the given coefficient value.
+
+    Requires both '7-Day' and '5x:' on the line to avoid matching the 5-hour line
+    when coefficient values happen to be identical.
+    """
+    for line in rendered.split("\n"):
+        if value in line and "5x:" in line and "7-Day" in line:
+            return line
+    return ""
+
+
+def _value_has_green(line: str, value: str) -> bool:
+    """Return True iff a green ANSI code appears immediately before the value on this line.
+
+    Rich renders [green] inside style="dim" as ESC[2;32m (combined dim+green),
+    and bare [green] as ESC[32m.  Accept either form.
+    """
+    return f"\x1b[32m{value}" in line or f"\x1b[2;32m{value}" in line
+
+
+class TestFiveHourLimiterOverrideColoring:
+    """5-Hour Limiter coefficient values are green when overridden, plain when default."""
+
+    def setup_method(self):
+        self.r = UsageRenderer()
+
+    def test_5h_overridden_5x_triggers_green_ansi(self):
+        """When coefficients_5x_overridden=True, 5x value is wrapped in green ANSI."""
+        pm = _make_pm_status_with_override_flags(
+            coeff_5h_5x=0.0088, overridden_5x=True, overridden_20x=False
+        )
+        rendered = _render_display(self.r, pm)
+        line = _coeff_line(rendered, "0.0088")
+        assert line, "Coefficient line not found in rendered output"
+        assert _value_has_green(line, "0.0088"), (
+            f"Expected \\x1b[32m0.0088 in coefficient line, got: {repr(line)}"
+        )
+
+    def test_5h_non_overridden_5x_no_green_ansi_for_value(self):
+        """When coefficients_5x_overridden=False, 5x value has no green ANSI wrapper."""
+        pm = _make_pm_status_with_override_flags(
+            coeff_5h_5x=0.0075, overridden_5x=False, overridden_20x=False
+        )
+        rendered = _render_display(self.r, pm)
+        line = _coeff_line(rendered, "0.0075")
+        assert line, "Coefficient line not found in rendered output"
+        assert not _value_has_green(line, "0.0075"), (
+            f"Expected no \\x1b[32m before 0.0075, got: {repr(line)}"
+        )
+
+    def test_5h_overridden_20x_triggers_green_ansi(self):
+        """When coefficients_20x_overridden=True, 20x value is wrapped in green ANSI."""
+        pm = _make_pm_status_with_override_flags(
+            coeff_5h_20x=0.0022, overridden_5x=False, overridden_20x=True
+        )
+        rendered = _render_display(self.r, pm)
+        line = _coeff_line(rendered, "0.0022")
+        assert line, "Coefficient line not found in rendered output"
+        assert _value_has_green(line, "0.0022"), (
+            f"Expected \\x1b[32m0.0022 in coefficient line, got: {repr(line)}"
+        )
+
+    def test_5h_non_overridden_20x_no_green_ansi(self):
+        """When coefficients_20x_overridden=False, 20x value has no green ANSI wrapper."""
+        pm = _make_pm_status_with_override_flags(
+            coeff_5h_20x=0.001875, overridden_5x=False, overridden_20x=False
+        )
+        rendered = _render_display(self.r, pm)
+        line = _coeff_line(rendered, "0.0019")
+        assert line, "Coefficient line not found in rendered output"
+        assert not _value_has_green(line, "0.0019"), (
+            f"Expected no \\x1b[32m before 0.0019, got: {repr(line)}"
+        )
+
+
+# ===========================================================================
+# Section 6: Display uses green for overridden 7-day coefficients (Story #4)
+# ===========================================================================
+
+
+class TestSevenDayLimiterOverrideColoring:
+    """7-Day Limiter coefficient values are green when overridden, plain when default."""
+
+    def setup_method(self):
+        self.r = UsageRenderer()
+
+    def test_7d_overridden_5x_triggers_green_ansi(self):
+        """When coefficients_5x_overridden=True, 7-day 5x value is wrapped in green ANSI."""
+        pm = _make_pm_status_with_override_flags(
+            coeff_7d_5x=0.0099, overridden_5x=True, overridden_20x=False
+        )
+        rendered = _render_display(self.r, pm)
+        line = _coeff_line_7d(rendered, "0.0099")
+        assert line, "7-Day coefficient line not found in rendered output"
+        assert _value_has_green(line, "0.0099"), (
+            f"Expected \\x1b[32m0.0099 in 7-day coefficient line, got: {repr(line)}"
+        )
+
+    def test_7d_non_overridden_5x_no_green_ansi_for_value(self):
+        """When coefficients_5x_overridden=False, 7-day 5x value has no green ANSI wrapper."""
+        pm = _make_pm_status_with_override_flags(
+            coeff_7d_5x=0.0011, overridden_5x=False, overridden_20x=False
+        )
+        rendered = _render_display(self.r, pm)
+        line = _coeff_line_7d(rendered, "0.0011")
+        assert line, "7-Day coefficient line not found in rendered output"
+        assert not _value_has_green(line, "0.0011"), (
+            f"Expected no \\x1b[32m before 0.0011 on 7-day line, got: {repr(line)}"
+        )

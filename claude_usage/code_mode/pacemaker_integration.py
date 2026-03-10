@@ -233,6 +233,8 @@ class PaceMakerReader:
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "coefficients_5h": None,
                 "coefficients_7d": None,
+                "coefficients_5x_overridden": False,
+                "coefficients_20x_overridden": False,
             }
 
         # Calculate pacing decision using pace-maker's algorithm
@@ -326,6 +328,8 @@ class PaceMakerReader:
                     "5x": coeff_7d_5x,
                     "20x": coeff_7d_20x,
                 }
+                status_result["coefficients_5x_overridden"] = cal_5x is not None
+                status_result["coefficients_20x_overridden"] = cal_20x is not None
             except Exception as e:
                 # Coefficients are optional display data; log for debugging but don't fail
                 logging.debug("Failed to fetch pacemaker coefficients: %s", e)
@@ -363,6 +367,8 @@ class PaceMakerReader:
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "coefficients_5h": None,
                 "coefficients_7d": None,
+                "coefficients_5x_overridden": False,
+                "coefficients_20x_overridden": False,
             }
 
     def _read_config(self) -> Optional[Dict[str, Any]]:
