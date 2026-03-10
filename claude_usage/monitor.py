@@ -75,8 +75,12 @@ def detect_mode(credentials_path):
 def parse_args():
     """Parse command line arguments"""
     import argparse
+    from claude_usage import __version__
 
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--version", action="version", version=f"claude-usage {__version__}"
+    )
     parser.add_argument("--mode", default=None)
     return parser.parse_args()
 
