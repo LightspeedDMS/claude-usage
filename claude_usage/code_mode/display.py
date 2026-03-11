@@ -105,6 +105,8 @@ class UsageRenderer:
         email = account.get("email", "")
         org_name = org.get("name", "")
         rate_tier = org.get("rate_limit_tier", "")
+        _KNOWN_TIERS = {"default_claude_max_5x": "5x", "default_claude_max_20x": "20x"}
+        rate_tier = _KNOWN_TIERS.get(rate_tier, rate_tier)
 
         # Strip "Organization" word entirely if present (Claude API sometimes includes it)
         if display_name:

@@ -107,7 +107,7 @@ Press Ctrl+C to stop
 ┌ Claude Code Usage ──────────────────────────┐
 │ 👤 User (user@example.com)                  │
 │ 🏢 Company Name ENTERPRISE                  │
-│ ⚡ Tier: default_claude_max_5x              │
+│ ⚡ Tier: 5x                                 │
 │                                             │
 │ 5-Hour Limit: ████████████████░░ 96%       │
 │ ⏰ Resets in: 1h 40m                        │
@@ -122,7 +122,7 @@ Press Ctrl+C to stop
 │ 👤 John Doe (john@company.com)                          │
 │ 🏢 Acme Corporation                                     │
 │    Plan: ENTERPRISE                                     │
-│ ⚡ Tier: default_claude_max_5x                          │
+│ ⚡ Tier: 5x                                              │
 │                                                          │
 │ 5-Hour Usage:  ████████████████░░░░ 78%                 │
 │ ⏰ Resets in: 3h 45m                                    │
