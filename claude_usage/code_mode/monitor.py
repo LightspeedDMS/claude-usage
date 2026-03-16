@@ -197,7 +197,7 @@ class CodeMonitor:
 
         if usage_data:
             self.last_usage = usage_data
-            self.last_update = datetime.now(timezone.utc)
+            self.last_update = datetime.now()
             self.error_message = None
             return True
         else:
