@@ -125,7 +125,7 @@ class CodeMonitor:
                         logging.debug(
                             f"Failed to merge per-model fields from api_cache: {e}"
                         )
-                    self.last_update = ts
+                    self.last_update = ts.astimezone(tz=None).replace(tzinfo=None)
                     self.error_message = None
                     return True
         except ImportError:
