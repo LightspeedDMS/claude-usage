@@ -14,8 +14,7 @@ from rich.console import Console
 from claude_usage.code_mode.display import UsageRenderer
 from claude_usage.code_mode.pacemaker_integration import PaceMakerReader
 
-# Default clean code rules count from pace-maker
-DEFAULT_CLEAN_CODE_RULES_COUNT = 17
+from claude_usage.code_mode.pacemaker_integration import DEFAULT_CLEAN_CODE_RULES_COUNT
 
 
 class TestNewStatusIndicatorsDisplay(unittest.TestCase):

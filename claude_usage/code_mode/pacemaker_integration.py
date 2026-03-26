@@ -15,7 +15,7 @@ from datetime import datetime
 SECONDS_IN_24_HOURS = 86400
 
 # Default clean code rules count from pace-maker
-DEFAULT_CLEAN_CODE_RULES_COUNT = 17
+DEFAULT_CLEAN_CODE_RULES_COUNT = 25
 
 # Langfuse connection timeout in seconds
 LANGFUSE_CONNECTION_TIMEOUT = 3
@@ -715,7 +715,18 @@ class PaceMakerReader:
             if str(pm_src) not in sys.path:
                 sys.path.insert(0, str(pm_src))
 
-            # Import clean_code_rules module and get default rules
+            # Import clean_code_rules module and get default rules.
+            # Reload if already cached so changes after ./install.sh are picked up
+            # without restarting the monitor (fixes module import caching issue).
+            import importlib
+
+            _ccr_module_name = "pacemaker.clean_code_rules"
+            if _ccr_module_name in sys.modules:
+                try:
+                    importlib.reload(sys.modules[_ccr_module_name])
+                except (TypeError, AttributeError, ImportError):
+                    pass  # Reload failed (e.g., mock in tests); use cached module
+
             from pacemaker.clean_code_rules import get_default_rules
 
             rules = get_default_rules()
@@ -781,6 +792,16 @@ class PaceMakerReader:
             # Add to path if not already present
             if str(pm_src) not in sys.path:
                 sys.path.insert(0, str(pm_src))
+
+            # Reload pacemaker package if already cached so version changes after
+            # ./install.sh are picked up without restarting the monitor.
+            import importlib
+
+            if "pacemaker" in sys.modules:
+                try:
+                    importlib.reload(sys.modules["pacemaker"])
+                except (TypeError, AttributeError, ImportError):
+                    pass  # Reload failed (e.g., mock in tests); use cached module
 
             from pacemaker import __version__
 
