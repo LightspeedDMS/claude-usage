@@ -208,6 +208,15 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
         mock_db_path = MagicMock()
         mock_db_path.exists.return_value = False
 
+        # Configure __truediv__ so mock_pm_dir / "src" returns a mock with
+        # exists()=False, preventing _get_pacemaker_src_path() from returning
+        # a truthy MagicMock that gets inserted into sys.path (which causes
+        # pytest to create junk directories from its string representation).
+        mock_subpath = MagicMock()
+        mock_subpath.exists.return_value = False
+        mock_pm_dir.__truediv__ = MagicMock(return_value=mock_subpath)
+
+        mock_path.home.return_value.__truediv__ = MagicMock(return_value=mock_pm_dir)
         mock_path.home.return_value.joinpath.return_value = mock_pm_dir
         mock_pm_dir.exists.return_value = True
 
@@ -220,7 +229,10 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
             reader.config_path = mock_config_path
             reader.db_path = mock_db_path
 
-            status = reader.get_status()
+            # Mock _get_latest_usage to prevent real UsageModel from creating
+            # a SQLite file named after the MagicMock db_path string.
+            with patch.object(reader, "_get_latest_usage", return_value=None):
+                status = reader.get_status()
 
             # Should include tdd_enabled field (defaults to False when no data)
             # When there's no usage data, get_status returns {"enabled": True, "has_data": False}
@@ -246,6 +258,15 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
         mock_conn.cursor.return_value = mock_cursor
         mock_sqlite3.connect.return_value = mock_conn
 
+        # Configure __truediv__ so mock_pm_dir / "src" returns a mock with
+        # exists()=False, preventing _get_pacemaker_src_path() from returning
+        # a truthy MagicMock that gets inserted into sys.path (which causes
+        # pytest to create junk directories from its string representation).
+        mock_subpath = MagicMock()
+        mock_subpath.exists.return_value = False
+        mock_pm_dir.__truediv__ = MagicMock(return_value=mock_subpath)
+
+        mock_path.home.return_value.__truediv__ = MagicMock(return_value=mock_pm_dir)
         mock_path.home.return_value.joinpath.return_value = mock_pm_dir
         mock_pm_dir.exists.return_value = True
 
@@ -260,7 +281,10 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
             reader.config_path = mock_config_path
             reader.db_path = mock_db_path
 
-            status = reader.get_status()
+            # Mock _get_latest_usage to prevent real UsageModel from creating
+            # a SQLite file named after the MagicMock db_path string.
+            with patch.object(reader, "_get_latest_usage", return_value=None):
+                status = reader.get_status()
             self.assertIsNotNone(status)
 
     @patch("claude_usage.code_mode.pacemaker_integration.Path")
@@ -272,6 +296,15 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
         mock_db_path = MagicMock()
         mock_db_path.exists.return_value = False
 
+        # Configure __truediv__ so mock_pm_dir / "src" returns a mock with
+        # exists()=False, preventing _get_pacemaker_src_path() from returning
+        # a truthy MagicMock that gets inserted into sys.path (which causes
+        # pytest to create junk directories from its string representation).
+        mock_subpath = MagicMock()
+        mock_subpath.exists.return_value = False
+        mock_pm_dir.__truediv__ = MagicMock(return_value=mock_subpath)
+
+        mock_path.home.return_value.__truediv__ = MagicMock(return_value=mock_pm_dir)
         mock_path.home.return_value.joinpath.return_value = mock_pm_dir
         mock_pm_dir.exists.return_value = True
 
@@ -284,7 +317,10 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
             reader.config_path = mock_config_path
             reader.db_path = mock_db_path
 
-            status = reader.get_status()
+            # Mock _get_latest_usage to prevent real UsageModel from creating
+            # a SQLite file named after the MagicMock db_path string.
+            with patch.object(reader, "_get_latest_usage", return_value=None):
+                status = reader.get_status()
             self.assertIsNotNone(status)
 
     @patch("claude_usage.code_mode.pacemaker_integration.Path")
@@ -297,6 +333,11 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
         mock_db_path = MagicMock()
         mock_db_path.exists.return_value = False
 
+        mock_subpath = MagicMock()
+        mock_subpath.exists.return_value = False
+        mock_pm_dir.__truediv__ = MagicMock(return_value=mock_subpath)
+
+        mock_path.home.return_value.__truediv__ = MagicMock(return_value=mock_pm_dir)
         mock_path.home.return_value.joinpath.return_value = mock_pm_dir
         mock_pm_dir.exists.return_value = True
 
@@ -323,6 +364,11 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
         mock_config_path = MagicMock()
         mock_config_path.exists.return_value = True
 
+        mock_subpath = MagicMock()
+        mock_subpath.exists.return_value = False
+        mock_pm_dir.__truediv__ = MagicMock(return_value=mock_subpath)
+
+        mock_path.home.return_value.__truediv__ = MagicMock(return_value=mock_pm_dir)
         mock_path.home.return_value.joinpath.return_value = mock_pm_dir
         mock_pm_dir.exists.return_value = True
 
@@ -342,6 +388,11 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
         mock_config_path = MagicMock()
         mock_config_path.exists.return_value = True
 
+        mock_subpath = MagicMock()
+        mock_subpath.exists.return_value = False
+        mock_pm_dir.__truediv__ = MagicMock(return_value=mock_subpath)
+
+        mock_path.home.return_value.__truediv__ = MagicMock(return_value=mock_pm_dir)
         mock_path.home.return_value.joinpath.return_value = mock_pm_dir
         mock_pm_dir.exists.return_value = True
 
@@ -365,6 +416,11 @@ class TestNewStatusFieldsPaceMakerReader(unittest.TestCase):
         mock_config_path = MagicMock()
         mock_config_path.exists.return_value = True
 
+        mock_subpath = MagicMock()
+        mock_subpath.exists.return_value = False
+        mock_pm_dir.__truediv__ = MagicMock(return_value=mock_subpath)
+
+        mock_path.home.return_value.__truediv__ = MagicMock(return_value=mock_pm_dir)
         mock_path.home.return_value.joinpath.return_value = mock_pm_dir
         mock_pm_dir.exists.return_value = True
 
@@ -412,6 +468,11 @@ class TestNewStatusFieldsIntegration(unittest.TestCase):
         mock_conn.cursor.return_value = mock_cursor
         mock_sqlite3.connect.return_value = mock_conn
 
+        mock_subpath = MagicMock()
+        mock_subpath.exists.return_value = False
+        mock_pm_dir.__truediv__ = MagicMock(return_value=mock_subpath)
+
+        mock_path.home.return_value.__truediv__ = MagicMock(return_value=mock_pm_dir)
         mock_path.home.return_value.joinpath.return_value = mock_pm_dir
         mock_pm_dir.exists.return_value = True
 
