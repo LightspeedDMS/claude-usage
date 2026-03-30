@@ -809,6 +809,58 @@ class PaceMakerReader:
         except ImportError:
             return "unknown"
 
+    def get_governance_events(self, window_seconds: int = 3600) -> list:
+        """Get governance events from the pace-maker database.
+
+        Reads from the governance_events table and returns events within
+        the specified time window, ordered newest first.
+
+        Args:
+            window_seconds: How many seconds back to look (default 3600 = 1h)
+
+        Returns:
+            List of dicts with event_type, project_name, session_id,
+            feedback_text, and timestamp keys. Returns [] on any error.
+        """
+        if not self.db_path.exists():
+            return []
+
+        try:
+            import time
+
+            cutoff = time.time() - window_seconds
+
+            conn = sqlite3.connect(str(self.db_path), timeout=5.0)
+            conn.execute("PRAGMA journal_mode=WAL")
+            try:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT event_type, project_name, session_id,
+                           feedback_text, timestamp
+                    FROM governance_events
+                    WHERE timestamp >= ?
+                    ORDER BY timestamp DESC
+                    """,
+                    (cutoff,),
+                )
+                rows = cursor.fetchall()
+                return [
+                    {
+                        "event_type": row[0],
+                        "project_name": row[1],
+                        "session_id": row[2],
+                        "feedback_text": row[3],
+                        "timestamp": row[4],
+                    }
+                    for row in rows
+                ]
+            finally:
+                conn.close()
+
+        except (sqlite3.Error, OSError):
+            return []
+
     def get_recent_activity(self, window_seconds: int = 10) -> list:
         """Get the most recent activity event per event_code within the time window.
 

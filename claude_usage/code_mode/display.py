@@ -1,11 +1,68 @@
 """UI rendering for Code mode usage monitor"""
 
+import re
+import textwrap
 import time
 from datetime import datetime, timezone
 from rich.progress import BarColumn, Progress, TextColumn
 from rich.table import Table
 from rich.text import Text
 from rich.console import Group
+
+
+def _md_to_rich(text):
+    """Convert basic markdown formatting to Rich markup for event feed."""
+    # Escape literal brackets so Rich doesn't misinterpret them
+    text = text.replace("[", "\\[")
+    # Bold: **text** → [bold]text[/bold]
+    text = re.sub(r"\*\*(.+?)\*\*", r"[bold]\1[/bold]", text)
+    # Inline code: `text` → [cyan]text[/cyan]
+    text = re.sub(r"`([^`]+)`", r"[cyan]\1[/cyan]", text)
+    return text
+
+
+def _format_feedback_lines(feedback, wrap_width):
+    """Wrap feedback text and apply markdown-to-Rich-markup styling."""
+    if not feedback:
+        return []
+    if wrap_width < 10:
+        wrap_width = 10
+
+    lines = []
+    in_code_block = False
+
+    for raw_line in feedback.split("\n"):
+        stripped = raw_line.strip()
+
+        # Toggle code fence blocks
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+
+        if in_code_block:
+            escaped = stripped.replace("[", "\\[")
+            lines.append(f"  [dim cyan]{escaped}[/dim cyan]")
+            continue
+
+        # Bullet points
+        if stripped.startswith("- "):
+            styled = _md_to_rich(stripped[2:])
+            wrapped = textwrap.wrap(styled, width=wrap_width - 4)
+            if wrapped:
+                lines.append(f"  [dim]•[/dim] {wrapped[0]}")
+                for cont in wrapped[1:]:
+                    lines.append(f"    {cont}")
+            continue
+
+        # Regular text with markdown conversion
+        styled = _md_to_rich(stripped)
+        if not styled:
+            continue
+        wrapped = textwrap.wrap(styled, width=wrap_width - 2)
+        for w in wrapped:
+            lines.append(f"  {w}")
+
+    return lines
 
 
 class UsageRenderer:
@@ -901,6 +958,155 @@ class UsageRenderer:
         centered_instruction = Text(" " * pad_left + ctrl_text, style="dim")
 
         return Group(table, centered_instruction)
+
+    def render_event_feed(
+        self,
+        events,
+        available_width,
+        visible_lines=20,
+        scroll_offset=0,
+    ):
+        """Render a scrollable governance event feed.
+
+        Args:
+            events: List of governance event dicts from get_governance_events()
+            available_width: Width in characters for text wrapping
+            visible_lines: Max lines to display (default 20)
+            scroll_offset: Number of events to skip from top (default 0)
+
+        Returns:
+            Rich Text renderable with event feed
+        """
+        _ICON_MAP = {"IV": "\u2716", "TD": "\u26a0", "CC": "\u27e1"}
+        separator = "\u2500" * available_width
+
+        if not events:
+            footer = "\u2500\u2500 0 events (last 1h) \u2191\u2193 scroll \u2500\u2500"
+            return Text.from_markup(f"[dim]{footer}[/dim]")
+
+        # Render all events into lines
+        all_lines = []
+        event_line_counts = []  # track lines per event for scroll calc
+
+        for event in events:
+            event_lines = []
+            icon = _ICON_MAP.get(event.get("event_type", ""), "?")
+            ts = event.get("timestamp", 0)
+            try:
+                dt = datetime.fromtimestamp(ts)
+                time_str = dt.strftime("%H:%M:%S")
+            except (OSError, ValueError):
+                time_str = "??:??:??"
+
+            etype = event.get("event_type", "??")
+            proj = event.get("project_name", "unknown")
+            header = f"{icon} {time_str} {etype} {proj}"
+            event_lines.append(header)
+
+            feedback = event.get("feedback_text", "")
+            wrap_width = max(available_width - 2, 20)
+            styled_lines = _format_feedback_lines(feedback, wrap_width)
+            event_lines.extend(styled_lines)
+
+            event_lines.append(separator)
+            event_line_counts.append(len(event_lines))
+            all_lines.extend(event_lines)
+
+        # Apply scroll offset (in events, not lines)
+        line_start = sum(event_line_counts[:scroll_offset])
+        visible_slice = all_lines[line_start : line_start + visible_lines]
+
+        # Build output with scroll indicators
+        output_lines = []
+
+        if scroll_offset > 0:
+            output_lines.append(
+                f"[dim]\u25b2 {scroll_offset} more events (scroll \u2191)[/dim]"
+            )
+
+        for line in visible_slice:
+            output_lines.append(line)
+
+        # Check if there are more events below
+        remaining_lines = len(all_lines) - line_start - visible_lines
+        if remaining_lines > 0:
+            # Count remaining events
+            lines_accum = 0
+            remaining_events = 0
+            for i in range(scroll_offset, len(event_line_counts)):
+                lines_accum += event_line_counts[i]
+                if lines_accum > visible_lines:
+                    remaining_events = len(event_line_counts) - i
+                    break
+            if remaining_events > 0:
+                output_lines.append(
+                    f"[dim]\u25bc {remaining_events} more events (scroll \u2193)[/dim]"
+                )
+
+        # Footer
+        total = len(events)
+        footer = (
+            f"\u2500\u2500 {total} events (last 1h) \u2191\u2193 scroll \u2500\u2500"
+        )
+        output_lines.append(f"[dim]{footer}[/dim]")
+
+        return Text.from_markup("\n".join(output_lines))
+
+    # Layout constants for two-column event feed
+    LEFT_COL_WIDTH = 50
+    MIN_TWO_COL_WIDTH = 85
+
+    def render_with_event_feed(
+        self,
+        main_content,
+        events,
+        terminal_width,
+        terminal_height=0,
+        scroll_offset=0,
+    ):
+        """Render main content with optional event feed in two-column layout.
+
+        When terminal_width >= 85, creates a grid with main content on the
+        left and a governance event feed on the right. When < 85, returns
+        just the main content.
+
+        Args:
+            main_content: Rich renderable for the left/main column
+            events: List of governance event dicts
+            terminal_width: Current terminal width in columns
+            terminal_height: Current terminal height in lines (0 = use default)
+            scroll_offset: Event scroll offset (default 0)
+
+        Returns:
+            Rich renderable (Group or Table grid)
+        """
+        if terminal_width < self.MIN_TWO_COL_WIDTH:
+            return main_content
+
+        # Dynamic height: fill from top to Ctrl+C footer line
+        # Reserve 3 lines for scroll indicators + footer
+        if terminal_height > 0:
+            visible_lines = max(terminal_height - 3, 10)
+        else:
+            visible_lines = 40
+
+        right_width = terminal_width - self.LEFT_COL_WIDTH - 3
+        right_width = max(right_width, 20)
+
+        event_feed = self.render_event_feed(
+            events,
+            available_width=right_width,
+            visible_lines=visible_lines,
+            scroll_offset=scroll_offset,
+        )
+
+        grid = Table.grid(padding=(0, 1))
+        grid.add_column("main", width=self.LEFT_COL_WIDTH)
+        grid.add_column("sep", width=1)
+        grid.add_column("feed", ratio=1)
+        grid.add_row(main_content, Text("\u2502", style="dim"), event_feed)
+
+        return grid
 
 
 # Activity event groups: each tuple is a visual group separated by spaces.

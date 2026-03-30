@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from datetime import datetime, timezone
@@ -49,6 +50,11 @@ class CodeMonitor:
         self.last_profile = None
         self.last_update = None
         self.error_message = None
+
+        # Governance event feed scroll state
+        self.scroll_offset = 0
+        self.user_scrolled = False
+        self.prev_event_count = 0
 
         # Load initial credentials
         self._load_credentials()
@@ -342,10 +348,139 @@ class CodeMonitor:
                 secrets_metrics=secrets_metrics,
             )
 
-            return Group(main_display, bottom_section)
+            combined_display = Group(main_display, bottom_section)
+        else:
+            instruction = Text("Press Ctrl+C to stop", style="dim")
+            combined_display = Group(main_display, instruction)
 
-        instruction = Text("Press Ctrl+C to stop", style="dim")
-        return Group(main_display, instruction)
+        # Governance event feed (two-column layout when wide enough)
+        governance_events = []
+        if pacemaker_status:
+            try:
+                governance_events = self.pacemaker_reader.get_governance_events(
+                    window_seconds=3600
+                )
+            except Exception as e:
+                logging.debug("Governance events fetch failed: %s", e)
+
+        # Auto-scroll: reset to top when new events arrive (unless user scrolled)
+        # Use getattr for robustness - tests may bypass __init__
+        current_count = len(governance_events)
+        prev_count = getattr(self, "prev_event_count", 0)
+        user_scrolled = getattr(self, "user_scrolled", False)
+        if current_count > prev_count and not user_scrolled:
+            self.scroll_offset = 0
+        self.prev_event_count = current_count
+
+        # Detect terminal width for responsive layout
+        try:
+            term_size = os.get_terminal_size()
+            terminal_width = term_size.columns
+            terminal_height = term_size.lines
+        except (ValueError, OSError):
+            terminal_width = 80
+            terminal_height = 40
+
+        scroll_offset = getattr(self, "scroll_offset", 0)
+        return self.renderer.render_with_event_feed(
+            main_content=combined_display,
+            events=governance_events,
+            terminal_width=terminal_width,
+            terminal_height=terminal_height,
+            scroll_offset=scroll_offset,
+        )
+
+    def _start_key_listener(self):
+        """Start a daemon thread for non-blocking keyboard input.
+
+        Reads arrow keys for scroll control. Uses terminal raw mode
+        with proper cleanup on exit.
+
+        Returns:
+            queue.Queue for key events, or None if raw mode unavailable
+        """
+        import queue
+        import threading
+
+        key_queue = queue.Queue()
+
+        try:
+            import sys
+            import tty
+            import termios
+
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+        except Exception:
+            # Handles ImportError, AttributeError, termios.error,
+            # UnsupportedOperation (pytest redirected stdin), etc.
+            return None
+
+        import atexit
+
+        def restore_terminal():
+            try:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            except Exception:
+                pass
+
+        atexit.register(restore_terminal)
+
+        def reader():
+            try:
+                tty.setcbreak(fd)
+                while True:
+                    try:
+                        ch = sys.stdin.read(1)
+                        if ch == "\x03":  # Ctrl+C
+                            key_queue.put("QUIT")
+                            break
+                        if ch == "\x1b":
+                            ch2 = sys.stdin.read(1)
+                            if ch2 == "[":
+                                ch3 = sys.stdin.read(1)
+                                if ch3 == "A":
+                                    key_queue.put("UP")
+                                elif ch3 == "B":
+                                    key_queue.put("DOWN")
+                    except (IOError, OSError):
+                        break
+            finally:
+                restore_terminal()
+
+        t = threading.Thread(target=reader, daemon=True)
+        t.start()
+        return key_queue
+
+    def _drain_key_queue(self, key_queue, max_events):
+        """Process key events from the queue, updating scroll state.
+
+        Args:
+            key_queue: Queue of key event strings
+            max_events: Maximum number of governance events (for bounds)
+
+        Returns:
+            True if QUIT was received, False otherwise
+        """
+        while not key_queue.empty():
+            try:
+                key = key_queue.get_nowait()
+            except Exception:
+                break
+            if key == "QUIT":
+                return True
+            if key == "UP":
+                if self.scroll_offset > 0:
+                    self.scroll_offset -= 1
+                if self.scroll_offset == 0:
+                    self.user_scrolled = False
+                else:
+                    self.user_scrolled = True
+            elif key == "DOWN":
+                if self.scroll_offset < max(0, max_events - 1):
+                    self.scroll_offset += 1
+                    self.user_scrolled = True
+        return False
 
     def run(self):
         """Main run loop for Code mode monitoring.
@@ -361,9 +496,20 @@ class CodeMonitor:
         self.fetch_usage()
         last_poll_time = time.time()
 
+        # Start keyboard listener for event feed scrolling
+        key_queue = self._start_key_listener()
+
         try:
             with Live(refresh_per_second=1, console=console) as live:
                 while True:
+                    # Process keyboard input for scroll control
+                    if key_queue:
+                        quit_requested = self._drain_key_queue(
+                            key_queue, self.prev_event_count
+                        )
+                        if quit_requested:
+                            return 0
+
                     # Re-read freshest data from UsageModel (cheap SQLite query)
                     self._refresh_from_model()
 
