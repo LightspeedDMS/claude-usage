@@ -46,21 +46,19 @@ def _format_feedback_lines(feedback, wrap_width):
 
         # Bullet points
         if stripped.startswith("- "):
-            styled = _md_to_rich(stripped[2:])
-            wrapped = textwrap.wrap(styled, width=wrap_width - 4)
+            wrapped = textwrap.wrap(stripped[2:], width=wrap_width - 4)
             if wrapped:
-                lines.append(f"  [dim]•[/dim] {wrapped[0]}")
+                lines.append(f"  [dim]•[/dim] {_md_to_rich(wrapped[0])}")
                 for cont in wrapped[1:]:
-                    lines.append(f"    {cont}")
+                    lines.append(f"    {_md_to_rich(cont)}")
             continue
 
         # Regular text with markdown conversion
-        styled = _md_to_rich(stripped)
-        if not styled:
+        if not stripped:
             continue
-        wrapped = textwrap.wrap(styled, width=wrap_width - 2)
+        wrapped = textwrap.wrap(stripped, width=wrap_width - 2)
         for w in wrapped:
-            lines.append(f"  {w}")
+            lines.append(f"  {_md_to_rich(w)}")
 
     return lines
 
@@ -731,18 +729,36 @@ class UsageRenderer:
                 self._fmt_kv("TDD:", "off", "[yellow]off[/yellow]", status_col_width)
             )
 
-        # Model preference status
+        # Subagent model preference
         preferred_model = pacemaker_status.get("preferred_subagent_model", "auto")
         if preferred_model == "auto":
             left_lines.append(
-                self._fmt_kv("Model:", "auto", "[cyan]auto[/cyan]", status_col_width)
+                self._fmt_kv("Subagent:", "auto", "[cyan]auto[/cyan]", status_col_width)
             )
         else:
             left_lines.append(
                 self._fmt_kv(
-                    "Model:",
+                    "Subagent:",
                     preferred_model,
                     f"[green]{preferred_model}[/green]",
+                    status_col_width,
+                )
+            )
+
+        # Hook inference model
+        hook_model = pacemaker_status.get("hook_model", "auto")
+        if hook_model == "auto":
+            left_lines.append(
+                self._fmt_kv(
+                    "Hook Model:", "auto", "[cyan]auto[/cyan]", status_col_width
+                )
+            )
+        else:
+            left_lines.append(
+                self._fmt_kv(
+                    "Hook Model:",
+                    hook_model,
+                    f"[green]{hook_model}[/green]",
                     status_col_width,
                 )
             )

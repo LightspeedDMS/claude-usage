@@ -2,7 +2,9 @@
 
 import unittest
 from unittest.mock import patch, MagicMock
-from claude_usage.code_mode.display import UsageRenderer
+from rich.text import Text
+from rich.errors import MarkupError
+from claude_usage.code_mode.display import UsageRenderer, _format_feedback_lines
 
 
 class TestUsageRenderer(unittest.TestCase):
@@ -168,6 +170,49 @@ class TestUsageRenderer(unittest.TestCase):
         from rich.progress import Progress
 
         self.assertIsInstance(content[0], Progress)
+
+
+class TestFormatFeedbackLines(unittest.TestCase):
+    """Regression tests for _format_feedback_lines markup safety."""
+
+    def test_format_feedback_lines_no_markup_error_when_wrapping_inline_code(self):
+        """Regression: wrapping text containing a backtick inline code span must not
+        split Rich markup tags across line boundaries.
+
+        The bug: _md_to_rich() was called before textwrap.wrap(), converting
+        `code` to [cyan]code[/cyan]. A literal '[' earlier in the text (escaped
+        to '\\[' by _md_to_rich) throws off textwrap's width accounting, causing
+        it to split the styled text inside the [cyan]...[/cyan] tags. The broken
+        tag fragments then render as literal text (e.g. '/cyan]' appears verbatim).
+
+        The fix: wrap plain text first, then apply _md_to_rich() per wrapped line.
+
+        Observable symptom: '/cyan]' appears as literal text in the rendered output.
+        """
+        import io
+        from rich.console import Console
+
+        # This string contains a literal '[' (escaped by _md_to_rich to '\\[') which
+        # throws off textwrap's width accounting, causing it to split inside
+        # the [cyan]...[/cyan] tags injected around the backtick span.
+        feedback = "Check [docs] then run `install_command` to complete setup process"
+        result = _format_feedback_lines(feedback, wrap_width=24)
+        self.assertGreater(
+            len(result), 1, "Input should have been wrapped into multiple lines"
+        )
+
+        # Render each line through the console to capture plain text output
+        console = Console(file=io.StringIO(), width=200, highlight=False)
+        for line in result:
+            console.print(line, markup=True, highlight=False)
+        rendered = console.file.getvalue()
+
+        self.assertNotIn(
+            "/cyan]",
+            rendered,
+            "'/cyan]' appeared as literal text in rendered output — "
+            "Rich markup tag was split across wrapped lines.",
+        )
 
 
 if __name__ == "__main__":

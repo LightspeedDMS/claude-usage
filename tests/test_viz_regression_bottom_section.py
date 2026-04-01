@@ -115,17 +115,36 @@ class TestRenderBottomSectionLeftColumn:
     def test_tdd_shown(self):
         assert "TDD" in self._render(_make_pacemaker_status(tdd_enabled=True))
 
-    # ---- Model preference ----
+    # ---- Subagent model preference ----
 
     def test_preferred_model_auto(self):
-        assert "auto" in self._render(
+        rendered = self._render(
             _make_pacemaker_status(preferred_subagent_model="auto")
         )
+        assert "Subagent:" in rendered
+        assert "auto" in rendered
 
     def test_preferred_model_custom(self):
-        assert "sonnet" in self._render(
+        rendered = self._render(
             _make_pacemaker_status(preferred_subagent_model="sonnet")
         )
+        assert "Subagent:" in rendered
+        assert "sonnet" in rendered
+
+    # ---- Hook model ----
+
+    def test_hook_model_auto(self):
+        rendered = self._render(
+            _make_pacemaker_status(hook_model="auto")
+        )
+        assert "Hook Model:" in rendered
+
+    def test_hook_model_custom(self):
+        rendered = self._render(
+            _make_pacemaker_status(hook_model="gpt-5")
+        )
+        assert "Hook Model:" in rendered
+        assert "gpt-5" in rendered
 
     # ---- Log level ----
 

@@ -228,6 +228,7 @@ class PaceMakerReader:
                 "preferred_subagent_model": config.get(
                     "preferred_subagent_model", "auto"
                 ),
+                "hook_model": config.get("hook_model", "auto"),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "coefficients_5h": None,
@@ -287,6 +288,7 @@ class PaceMakerReader:
                 "preferred_subagent_model": config.get(
                     "preferred_subagent_model", "auto"
                 ),
+                "hook_model": config.get("hook_model", "auto"),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "last_update": usage_data["timestamp"],
@@ -360,6 +362,7 @@ class PaceMakerReader:
                 "preferred_subagent_model": config.get(
                     "preferred_subagent_model", "auto"
                 ),
+                "hook_model": config.get("hook_model", "auto"),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "coefficients_5h": None,
