@@ -23,6 +23,12 @@ LANGFUSE_CONNECTION_TIMEOUT = 3
 # Default log level (2 = WARNING)
 DEFAULT_LOG_LEVEL = 2
 
+# SQLite connection timeout in seconds (used for all direct DB reads)
+DB_TIMEOUT = 5.0
+
+# Codex usage table singleton row id (pace-maker stores exactly one record)
+CODEX_USAGE_ROW_ID = 1
+
 
 def _is_pipx_installation(install_path: str) -> bool:
     """Check if installation path indicates pipx installation
@@ -212,6 +218,7 @@ class PaceMakerReader:
         # Get latest usage data from database
         usage_data = self._get_latest_usage()
         if not usage_data:
+            codex = self._read_codex_usage()
             return {
                 "enabled": enabled,
                 "has_data": False,
@@ -229,6 +236,8 @@ class PaceMakerReader:
                     "preferred_subagent_model", "auto"
                 ),
                 "hook_model": config.get("hook_model", "auto"),
+                "codex_primary_pct": codex["primary_used_pct"] if codex else None,
+                "codex_secondary_pct": codex["secondary_used_pct"] if codex else None,
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "coefficients_5h": None,
@@ -293,6 +302,15 @@ class PaceMakerReader:
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "last_update": usage_data["timestamp"],
             }
+
+            # Populate codex usage percentages for Hook Model color-coding
+            codex = self._read_codex_usage()
+            status_result["codex_primary_pct"] = (
+                codex["primary_used_pct"] if codex else None
+            )
+            status_result["codex_secondary_pct"] = (
+                codex["secondary_used_pct"] if codex else None
+            )
 
             # Propagate stale data flag if present
             # Use 'is True' to avoid false positives from MagicMock objects in tests
@@ -370,6 +388,35 @@ class PaceMakerReader:
                 "coefficients_5x_overridden": False,
                 "coefficients_20x_overridden": False,
             }
+
+    def _read_codex_usage(self) -> Optional[Dict[str, Any]]:
+        """Read Codex usage from the codex_usage table in pace-maker DB.
+
+        Returns:
+            Dict with primary_used_pct and secondary_used_pct, or None if
+            the table doesn't exist, is empty, or on any error.
+        """
+        if not self.db_path.exists():
+            return None
+        try:
+            with sqlite3.connect(str(self.db_path), timeout=DB_TIMEOUT) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT primary_used_pct, secondary_used_pct"
+                    " FROM codex_usage WHERE id = ?",
+                    (CODEX_USAGE_ROW_ID,),
+                )
+                row = cursor.fetchone()
+            if row is None:
+                return None
+            return {
+                "primary_used_pct": row[0],
+                "secondary_used_pct": row[1],
+            }
+        except (sqlite3.Error, OSError) as e:
+            logging.debug("Failed to read codex_usage from DB: %s", e)
+            return None
 
     def _read_config(self) -> Optional[Dict[str, Any]]:
         """Read pace-maker configuration file"""

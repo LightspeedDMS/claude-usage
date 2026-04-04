@@ -10,6 +10,13 @@ from rich.text import Text
 from rich.console import Group
 
 
+# Codex usage color thresholds (used_percent > threshold → that color)
+CODEX_RED_THRESHOLD = 95  # >95% → red
+CODEX_ORANGE_THRESHOLD = 75  # >75% → orange
+CODEX_YELLOW_THRESHOLD = 50  # >50% → yellow
+COLOR_ORANGE = "#ff8c00"  # Rich markup color for orange tier
+
+
 def _md_to_rich(text):
     """Convert basic markdown formatting to Rich markup for event feed."""
     # Escape literal brackets so Rich doesn't misinterpret them
@@ -754,11 +761,23 @@ class UsageRenderer:
                 )
             )
         else:
+            color = "green"
+            if "gpt" in hook_model.lower():
+                codex_primary = pacemaker_status.get("codex_primary_pct")
+                codex_secondary = pacemaker_status.get("codex_secondary_pct")
+                if codex_primary is not None and codex_secondary is not None:
+                    max_pct = max(codex_primary, codex_secondary)
+                    if max_pct > CODEX_RED_THRESHOLD:
+                        color = "red"
+                    elif max_pct > CODEX_ORANGE_THRESHOLD:
+                        color = COLOR_ORANGE
+                    elif max_pct > CODEX_YELLOW_THRESHOLD:
+                        color = "yellow"
             left_lines.append(
                 self._fmt_kv(
                     "Hook Model:",
                     hook_model,
-                    f"[green]{hook_model}[/green]",
+                    f"[{color}]{hook_model}[/{color}]",
                     status_col_width,
                 )
             )

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.6.0] - 2026-04-04
+
+### Added
+- **Codex GPT-5 usage color-coding** (#57): Hook Model field now color-codes "gpt-5" based on Codex subscription usage read from pace-maker's `codex_usage` SQLite table — green (≤50%), yellow (51–75%), orange (76–95%), red (>95%)
+- **`_read_codex_usage()`** in `pacemaker_integration.py`: Reads single-record `codex_usage` table from pace-maker `usage.db`; gracefully returns `None` on missing table or DB errors
+- **`codex_primary_pct` / `codex_secondary_pct`** added to pacemaker status dict: Populated in both `has_data=True` and `has_data=False` paths for consistent downstream consumption
+- **Color threshold constants**: `CODEX_RED_THRESHOLD=95`, `CODEX_ORANGE_THRESHOLD=75`, `CODEX_YELLOW_THRESHOLD=50`, `COLOR_ORANGE="#ff8c00"` in `display.py`
+- **11 new unit tests**: `tests/test_codex_usage_display.py` covering all 4 color tiers at exact boundary values (50, 51, 75, 76, 95, 96), `max(primary, secondary)` logic, no-data default green, non-GPT model passthrough, and auto model cyan preservation
+
 ## [2.5.0] - 2026-03-30
 
 ### Added
