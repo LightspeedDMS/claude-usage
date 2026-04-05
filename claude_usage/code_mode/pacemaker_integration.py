@@ -239,6 +239,7 @@ class PaceMakerReader:
                 "codex_primary_pct": codex["primary_used_pct"] if codex else None,
                 "codex_secondary_pct": codex["secondary_used_pct"] if codex else None,
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
+                "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "coefficients_5h": None,
                 "coefficients_7d": None,
@@ -299,6 +300,7 @@ class PaceMakerReader:
                 ),
                 "hook_model": config.get("hook_model", "auto"),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
+                "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "last_update": usage_data["timestamp"],
             }
@@ -382,6 +384,7 @@ class PaceMakerReader:
                 ),
                 "hook_model": config.get("hook_model", "auto"),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
+                "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "coefficients_5h": None,
                 "coefficients_7d": None,
@@ -744,11 +747,10 @@ class PaceMakerReader:
         return True
 
     def _get_clean_code_rules_count(self) -> int:
-        """Get the count of clean code rules from pace-maker.
+        """Get the count of merged clean code rules from pace-maker.
 
-        Attempts to load clean code rules from pace-maker's clean_code_rules module.
-        If the module cannot be imported or rules cannot be loaded, returns the
-        default count.
+        Calls load_rules() to get the actual merged count (defaults minus
+        deleted plus custom), not just the default count.
 
         Returns:
             Number of clean code rules configured, defaults to DEFAULT_CLEAN_CODE_RULES_COUNT
@@ -765,7 +767,6 @@ class PaceMakerReader:
             if str(pm_src) not in sys.path:
                 sys.path.insert(0, str(pm_src))
 
-            # Import clean_code_rules module and get default rules.
             # Reload if already cached so changes after ./install.sh are picked up
             # without restarting the monitor (fixes module import caching issue).
             import importlib
@@ -777,14 +778,53 @@ class PaceMakerReader:
                 except (TypeError, AttributeError, ImportError):
                     pass  # Reload failed (e.g., mock in tests); use cached module
 
-            from pacemaker.clean_code_rules import get_default_rules
+            from pacemaker.clean_code_rules import load_rules
 
-            rules = get_default_rules()
+            config_path = str(self.pm_dir / "clean_code_rules.yaml")
+            rules = load_rules(config_path)
             return len(rules)
 
-        except (ImportError, AttributeError, OSError):
-            # Cannot load pace-maker modules or rules - return default count
+        except (ImportError, AttributeError, OSError) as e:
+            logging.debug("Clean-code rules load failed, using default count: %s", e)
             return DEFAULT_CLEAN_CODE_RULES_COUNT
+
+    def _get_clean_code_rules_breakdown(self) -> Optional[Dict[str, int]]:
+        """Get breakdown of clean code rules by source (custom/deleted).
+
+        Returns:
+            Dict with 'custom' and 'deleted' counts, or None if unavailable
+            or no customizations exist.
+        """
+        try:
+            import sys
+
+            pm_src = self._get_pacemaker_src_path()
+            if not pm_src:
+                return None
+
+            if str(pm_src) not in sys.path:
+                sys.path.insert(0, str(pm_src))
+
+            from pacemaker.clean_code_rules import (
+                get_rules_metadata,
+                _load_custom_config,
+            )
+
+            config_path = str(self.pm_dir / "clean_code_rules.yaml")
+            metadata = get_rules_metadata(config_path)
+            custom_config = _load_custom_config(config_path)
+
+            custom_count = sum(1 for m in metadata if m.get("source") == "custom")
+            deleted_count = len(custom_config.get("deleted_rules", []))
+
+            if custom_count == 0 and deleted_count == 0:
+                return None  # No customizations — caller skips breakdown display
+
+            return {"custom": custom_count, "deleted": deleted_count}
+
+        except (ImportError, AttributeError, OSError, KeyError, TypeError) as e:
+            logging.debug("Rules breakdown unavailable, skipping display: %s", e)
+            return None
 
     def test_langfuse_connection(self) -> Dict[str, Any]:
         """Test Langfuse API connectivity.
