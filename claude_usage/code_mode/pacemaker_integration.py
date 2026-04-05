@@ -503,6 +503,7 @@ class PaceMakerReader:
             "intent_validation",
             "intent_validation_tdd",
             "intent_validation_cleancode",
+            "intent_validation_dangerbash",
             "pacing_tempo",
             "pacing_quota",
             "other",
