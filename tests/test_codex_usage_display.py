@@ -163,3 +163,63 @@ class TestAutoModelCyan:
         rendered = _render_hook_model("auto")
         assert "auto" in rendered
         assert ANSI_CYAN in rendered
+
+
+# ---------------------------------------------------------------------------
+# Tests: PAYG billing mode (limit_id='premium') → cyan
+# ---------------------------------------------------------------------------
+
+
+def _render_hook_model_with_billing(
+    hook_model: str,
+    codex_primary_pct: float | None = None,
+    codex_secondary_pct: float | None = None,
+    codex_limit_id: str | None = None,
+    codex_plan_type: str | None = "team",
+) -> str:
+    """Render bottom section with billing mode fields in pacemaker_status."""
+    pm = _make_pacemaker_status(hook_model=hook_model)
+    pm["codex_primary_pct"] = codex_primary_pct
+    pm["codex_secondary_pct"] = codex_secondary_pct
+    pm["codex_limit_id"] = codex_limit_id
+    pm["codex_plan_type"] = codex_plan_type
+    r = UsageRenderer()
+    return _render_to_str(r.render_bottom_section(pm, blockage_stats={}))
+
+
+class TestPaygBillingMode:
+    def test_payg_mode_shows_cyan(self):
+        """limit_id='premium' at high pct → Hook Model color is cyan (not red)"""
+        rendered = _render_hook_model_with_billing(
+            "gpt-5",
+            codex_primary_pct=96.0,
+            codex_secondary_pct=96.0,
+            codex_limit_id="premium",
+            codex_plan_type=None,
+        )
+        assert "gpt-5" in rendered
+        assert _hook_model_color(rendered, "gpt-5") == ANSI_CYAN
+
+    def test_payg_mode_null_plan_type_shows_cyan(self):
+        """limit_id='premium' AND plan_type=None at 0% → color is cyan (not green)"""
+        rendered = _render_hook_model_with_billing(
+            "gpt-5",
+            codex_primary_pct=0.0,
+            codex_secondary_pct=0.0,
+            codex_limit_id="premium",
+            codex_plan_type=None,
+        )
+        assert "gpt-5" in rendered
+        assert _hook_model_color(rendered, "gpt-5") == ANSI_CYAN
+
+    def test_subscription_mode_still_uses_thresholds(self):
+        """limit_id='codex' → percentage thresholds apply normally (96% → red)"""
+        rendered = _render_hook_model_with_billing(
+            "gpt-5",
+            codex_primary_pct=96.0,
+            codex_secondary_pct=10.0,
+            codex_limit_id="codex",
+            codex_plan_type="team",
+        )
+        assert "gpt-5" in rendered
+        assert _hook_model_color(rendered, "gpt-5") == ANSI_RED

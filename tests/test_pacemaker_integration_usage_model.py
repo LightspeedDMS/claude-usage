@@ -29,6 +29,7 @@ import sqlite3
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 
 # Add claude-usage src to path
@@ -353,3 +354,63 @@ class TestIsFallbackActiveUsesUsageModel:
 
         reader = _make_reader(pm_dir)
         assert reader.is_fallback_active() is True
+
+
+# ---------------------------------------------------------------------------
+# _read_codex_usage() returns limit_id and plan_type
+# ---------------------------------------------------------------------------
+
+
+def _seed_codex_usage(pm_dir: Path, limit_id: str, plan_type: Optional[str]) -> None:
+    """Insert a codex_usage row (with limit_id) directly into the DB."""
+    db_path = pm_dir / "usage.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS codex_usage (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            primary_used_pct REAL NOT NULL,
+            secondary_used_pct REAL NOT NULL,
+            primary_resets_at INTEGER,
+            secondary_resets_at INTEGER,
+            plan_type TEXT,
+            limit_id TEXT,
+            timestamp REAL NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO codex_usage "
+        "(id, primary_used_pct, secondary_used_pct, plan_type, limit_id, timestamp) "
+        "VALUES (1, 0.0, 0.0, ?, ?, ?)",
+        (plan_type, limit_id, time.time()),
+    )
+    conn.commit()
+    conn.close()
+
+
+class TestReadCodexUsageFields:
+    """_read_codex_usage() must return limit_id and plan_type from DB."""
+
+    def test_read_codex_usage_returns_limit_id(self, tmp_path):
+        """limit_id stored in DB is returned in _read_codex_usage() dict."""
+        pm_dir = _make_pm_dir(tmp_path)
+        _seed_codex_usage(pm_dir, limit_id="premium", plan_type=None)
+
+        reader = _make_reader(pm_dir)
+        result = reader._read_codex_usage()
+
+        assert result is not None
+        assert result["limit_id"] == "premium"
+
+    def test_read_codex_usage_returns_plan_type(self, tmp_path):
+        """plan_type stored in DB is returned in _read_codex_usage() dict."""
+        pm_dir = _make_pm_dir(tmp_path)
+        _seed_codex_usage(pm_dir, limit_id="codex", plan_type="team")
+
+        reader = _make_reader(pm_dir)
+        result = reader._read_codex_usage()
+
+        assert result is not None
+        assert result["plan_type"] == "team"

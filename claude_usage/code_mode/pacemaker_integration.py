@@ -238,6 +238,8 @@ class PaceMakerReader:
                 "hook_model": config.get("hook_model", "auto"),
                 "codex_primary_pct": codex["primary_used_pct"] if codex else None,
                 "codex_secondary_pct": codex["secondary_used_pct"] if codex else None,
+                "codex_limit_id": codex.get("limit_id") if codex else None,
+                "codex_plan_type": codex.get("plan_type") if codex else None,
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
@@ -305,7 +307,7 @@ class PaceMakerReader:
                 "last_update": usage_data["timestamp"],
             }
 
-            # Populate codex usage percentages for Hook Model color-coding
+            # Populate codex usage percentages and billing mode for Hook Model color-coding
             codex = self._read_codex_usage()
             status_result["codex_primary_pct"] = (
                 codex["primary_used_pct"] if codex else None
@@ -313,6 +315,8 @@ class PaceMakerReader:
             status_result["codex_secondary_pct"] = (
                 codex["secondary_used_pct"] if codex else None
             )
+            status_result["codex_limit_id"] = codex.get("limit_id") if codex else None
+            status_result["codex_plan_type"] = codex.get("plan_type") if codex else None
 
             # Propagate stale data flag if present
             # Use 'is True' to avoid false positives from MagicMock objects in tests
@@ -404,9 +408,10 @@ class PaceMakerReader:
         try:
             with sqlite3.connect(str(self.db_path), timeout=DB_TIMEOUT) as conn:
                 conn.execute("PRAGMA journal_mode=WAL")
+                conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT primary_used_pct, secondary_used_pct"
+                    "SELECT primary_used_pct, secondary_used_pct, plan_type, limit_id"
                     " FROM codex_usage WHERE id = ?",
                     (CODEX_USAGE_ROW_ID,),
                 )
@@ -414,8 +419,10 @@ class PaceMakerReader:
             if row is None:
                 return None
             return {
-                "primary_used_pct": row[0],
-                "secondary_used_pct": row[1],
+                "primary_used_pct": row["primary_used_pct"],
+                "secondary_used_pct": row["secondary_used_pct"],
+                "plan_type": row["plan_type"],
+                "limit_id": row["limit_id"] if "limit_id" in row.keys() else None,
             }
         except (sqlite3.Error, OSError) as e:
             logging.debug("Failed to read codex_usage from DB: %s", e)

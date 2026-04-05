@@ -763,16 +763,20 @@ class UsageRenderer:
         else:
             color = "green"
             if "gpt" in hook_model.lower():
-                codex_primary = pacemaker_status.get("codex_primary_pct")
-                codex_secondary = pacemaker_status.get("codex_secondary_pct")
-                if codex_primary is not None and codex_secondary is not None:
-                    max_pct = max(codex_primary, codex_secondary)
-                    if max_pct > CODEX_RED_THRESHOLD:
-                        color = "red"
-                    elif max_pct > CODEX_ORANGE_THRESHOLD:
-                        color = COLOR_ORANGE
-                    elif max_pct > CODEX_YELLOW_THRESHOLD:
-                        color = "yellow"
+                codex_limit_id = pacemaker_status.get("codex_limit_id")
+                if codex_limit_id == "premium":
+                    color = "cyan"
+                else:
+                    codex_primary = pacemaker_status.get("codex_primary_pct")
+                    codex_secondary = pacemaker_status.get("codex_secondary_pct")
+                    if codex_primary is not None and codex_secondary is not None:
+                        max_pct = max(codex_primary, codex_secondary)
+                        if max_pct > CODEX_RED_THRESHOLD:
+                            color = "red"
+                        elif max_pct > CODEX_ORANGE_THRESHOLD:
+                            color = COLOR_ORANGE
+                        elif max_pct > CODEX_YELLOW_THRESHOLD:
+                            color = "yellow"
             left_lines.append(
                 self._fmt_kv(
                     "Hook Model:",
