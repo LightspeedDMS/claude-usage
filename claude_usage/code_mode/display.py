@@ -16,6 +16,14 @@ CODEX_ORANGE_THRESHOLD = 75  # >75% → orange
 CODEX_YELLOW_THRESHOLD = 50  # >50% → yellow
 COLOR_ORANGE = "#ff8c00"  # Rich markup color for orange tier
 
+# Reviewer identity tags for governance event feed display
+REVIEWER_TAGS = {
+    "codex-gpt5": ("[Codex]", "yellow"),
+    "anthropic-sdk": ("[SDK]", "green"),
+    "gemini": ("[Gem]", "cyan"),
+}
+_REVIEWER_TAG_RE = re.compile(r"\[REVIEWER:([^\]]+)\]")
+
 
 def _md_to_rich(text):
     """Convert basic markdown formatting to Rich markup for event feed."""
@@ -1055,10 +1063,24 @@ class UsageRenderer:
 
             etype = event.get("event_type", "??")
             proj = event.get("project_name", "unknown")
-            header = f"{icon} {time_str} {etype} {proj}"
-            event_lines.append(header)
 
+            # Extract reviewer tag from feedback if present
             feedback = event.get("feedback_text", "")
+            reviewer_markup = ""
+            match = _REVIEWER_TAG_RE.search(feedback)
+            if match:
+                reviewer_id = match.group(1)
+                tag_info = REVIEWER_TAGS.get(reviewer_id)
+                if tag_info:
+                    tag_label, tag_color = tag_info
+                    reviewer_markup = f" [{tag_color}]{tag_label}[/{tag_color}]"
+                    # Strip the tag from feedback only when recognized
+                    feedback = (
+                        feedback[: match.start()] + feedback[match.end() :]
+                    ).lstrip()
+
+            header = f"{icon} {time_str} {etype}{reviewer_markup} {proj}"
+            event_lines.append(header)
             wrap_width = max(available_width - 2, 20)
             styled_lines = _format_feedback_lines(feedback, wrap_width)
             event_lines.extend(styled_lines)
