@@ -15,7 +15,7 @@ from datetime import datetime
 SECONDS_IN_24_HOURS = 86400
 
 # Default clean code rules count from pace-maker
-DEFAULT_CLEAN_CODE_RULES_COUNT = 25
+DEFAULT_CLEAN_CODE_RULES_COUNT = 20
 
 # Langfuse connection timeout in seconds
 LANGFUSE_CONNECTION_TIMEOUT = 3
