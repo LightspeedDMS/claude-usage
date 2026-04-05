@@ -744,6 +744,24 @@ class UsageRenderer:
                 self._fmt_kv("TDD:", "off", "[yellow]off[/yellow]", status_col_width)
             )
 
+        # Danger bash validation status
+        danger_bash_on = pacemaker_status.get("danger_bash_enabled", True)
+        if danger_bash_on:
+            left_lines.append(
+                self._fmt_kv(
+                    "Danger Bash:", "on", "[green]on[/green]", status_col_width
+                )
+            )
+        else:
+            left_lines.append(
+                self._fmt_kv(
+                    "Danger Bash:",
+                    "off",
+                    "[yellow]off[/yellow]",
+                    status_col_width,
+                )
+            )
+
         # Subagent model preference
         preferred_model = pacemaker_status.get("preferred_subagent_model", "auto")
         if preferred_model == "auto":
@@ -862,6 +880,40 @@ class UsageRenderer:
         else:
             left_lines.append(
                 self._fmt_kv("Rules:", "0", "[yellow]0[/yellow]", status_col_width)
+            )
+
+        # Danger bash rules count with optional breakdown
+        db_count = pacemaker_status.get("danger_bash_rules_count", 0)
+        db_breakdown = pacemaker_status.get("danger_bash_rules_breakdown")
+        if db_count > 0:
+            if db_breakdown:
+                db_custom = db_breakdown.get("custom", 0)
+                db_deleted = db_breakdown.get("deleted", 0)
+                db_defaults = db_count - db_custom + db_deleted
+                db_plain = f"{db_count} ({db_defaults} + {db_custom} - {db_deleted})"
+                db_markup = (
+                    f"[green]{db_count}[/green]"
+                    f" ([green]{db_defaults}[/green]"
+                    f" + [cyan]{db_custom}[/cyan]"
+                    f" - [red]{db_deleted}[/red])"
+                )
+                left_lines.append(
+                    self._fmt_kv("Danger Bash:", db_plain, db_markup, status_col_width)
+                )
+            else:
+                left_lines.append(
+                    self._fmt_kv(
+                        "Danger Bash:",
+                        str(db_count),
+                        f"[green]{db_count}[/green]",
+                        status_col_width,
+                    )
+                )
+        else:
+            left_lines.append(
+                self._fmt_kv(
+                    "Danger Bash:", "0", "[yellow]0[/yellow]", status_col_width
+                )
             )
 
         # Version info

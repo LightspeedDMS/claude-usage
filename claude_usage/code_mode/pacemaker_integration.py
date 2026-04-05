@@ -16,6 +16,7 @@ SECONDS_IN_24_HOURS = 86400
 
 # Default clean code rules count from pace-maker
 DEFAULT_CLEAN_CODE_RULES_COUNT = 20
+DEFAULT_DANGER_BASH_RULES_COUNT = 55
 
 # Langfuse connection timeout in seconds
 LANGFUSE_CONNECTION_TIMEOUT = 3
@@ -242,6 +243,9 @@ class PaceMakerReader:
                 "codex_plan_type": codex.get("plan_type") if codex else None,
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
+                "danger_bash_enabled": config.get("danger_bash_enabled", True),
+                "danger_bash_rules_count": self._get_danger_bash_rules_count(),
+                "danger_bash_rules_breakdown": self._get_danger_bash_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "coefficients_5h": None,
                 "coefficients_7d": None,
@@ -303,6 +307,9 @@ class PaceMakerReader:
                 "hook_model": config.get("hook_model", "auto"),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
+                "danger_bash_enabled": config.get("danger_bash_enabled", True),
+                "danger_bash_rules_count": self._get_danger_bash_rules_count(),
+                "danger_bash_rules_breakdown": self._get_danger_bash_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "last_update": usage_data["timestamp"],
             }
@@ -389,6 +396,9 @@ class PaceMakerReader:
                 "hook_model": config.get("hook_model", "auto"),
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
+                "danger_bash_enabled": config.get("danger_bash_enabled", True),
+                "danger_bash_rules_count": self._get_danger_bash_rules_count(),
+                "danger_bash_rules_breakdown": self._get_danger_bash_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
                 "coefficients_5h": None,
                 "coefficients_7d": None,
@@ -556,6 +566,7 @@ class PaceMakerReader:
             "intent_validation": "Intent Val.",
             "intent_validation_tdd": "Intent TDD",
             "intent_validation_cleancode": "Clean Code",
+            "intent_validation_dangerbash": "Danger Bash",
             "pacing_tempo": "Pacing Tempo",
             "pacing_quota": "Pacing Quota",
         }
@@ -831,6 +842,85 @@ class PaceMakerReader:
 
         except (ImportError, AttributeError, OSError, KeyError, TypeError) as e:
             logging.debug("Rules breakdown unavailable, skipping display: %s", e)
+            return None
+
+    def _ensure_pm_on_sys_path(self) -> bool:
+        """Ensure pace-maker source is on sys.path for dynamic imports.
+
+        Returns:
+            True if path is available and added, False otherwise.
+        """
+        import sys
+
+        pm_src = self._get_pacemaker_src_path()
+        if not pm_src:
+            return False
+        if str(pm_src) not in sys.path:
+            sys.path.insert(0, str(pm_src))
+        return True
+
+    def _get_danger_bash_rules_count(self) -> int:
+        """Get the count of merged danger bash rules from pace-maker.
+
+        Returns:
+            Number of danger bash rules configured, defaults to
+            DEFAULT_DANGER_BASH_RULES_COUNT.
+        """
+        try:
+            if not self._ensure_pm_on_sys_path():
+                return DEFAULT_DANGER_BASH_RULES_COUNT
+
+            import importlib
+            import sys
+
+            _mod = "pacemaker.danger_bash_rules"
+            if _mod in sys.modules:
+                try:
+                    importlib.reload(sys.modules[_mod])
+                except (TypeError, AttributeError, ImportError) as e:
+                    logging.debug(
+                        "Reload of %s skipped: %s; using cached module", _mod, e
+                    )
+
+            from pacemaker.danger_bash_rules import load_rules
+
+            config_path = str(self.pm_dir / "danger_bash_rules.yaml")
+            return len(load_rules(config_path))
+
+        except (ImportError, AttributeError, OSError) as e:
+            logging.debug("Danger-bash rules load failed: %s", e)
+            return DEFAULT_DANGER_BASH_RULES_COUNT
+
+    def _get_danger_bash_rules_breakdown(self) -> Optional[Dict[str, int]]:
+        """Get breakdown of danger bash rules by source (custom/deleted).
+
+        Returns:
+            Dict with 'custom' and 'deleted' counts, or None if no
+            customizations.
+        """
+        try:
+            if not self._ensure_pm_on_sys_path():
+                return None
+
+            from pacemaker.danger_bash_rules import (
+                get_rules_metadata,
+                _load_custom_config,
+            )
+
+            config_path = str(self.pm_dir / "danger_bash_rules.yaml")
+            metadata = get_rules_metadata(config_path)
+            custom_config = _load_custom_config(config_path)
+
+            custom_count = sum(1 for m in metadata if m.get("source") == "custom")
+            deleted_count = len(custom_config.get("deleted_rules", []))
+
+            if custom_count == 0 and deleted_count == 0:
+                return None
+
+            return {"custom": custom_count, "deleted": deleted_count}
+
+        except (ImportError, AttributeError, OSError, KeyError, TypeError) as e:
+            logging.debug("Danger-bash breakdown unavailable: %s", e)
             return None
 
     def test_langfuse_connection(self) -> Dict[str, Any]:
