@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.7.0] - 2026-04-04
+
+### Added
+- **Merged rule count display** (#55): `_get_clean_code_rules_count()` now calls `load_rules()` for actual merged count (defaults minus deleted plus custom) instead of `get_default_rules()` for default-only count
+- **`_get_clean_code_rules_breakdown()`**: Returns custom/deleted counts for display; returns None when no customizations exist
+- **Colored rule breakdown**: Rules field shows compact math format `25 (25 + 1 - 0)` with green defaults, cyan custom, red deleted when customizations exist; plain green count when none
+
+### Changed
+- **`DEFAULT_CLEAN_CODE_RULES_COUNT`**: Updated from 25 to 20 to match pace-maker v2.11.0 refactored rule set
+
 ## [2.6.0] - 2026-04-04
 
 ### Added

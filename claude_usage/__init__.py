@@ -63,7 +63,7 @@ class ClaudeUsageMonitor:
         return self.mode
 
 
-__version__ = "2.6.0"
+__version__ = "2.7.0"
 __author__ = "jsbattig"
 __license__ = "MIT"
 
