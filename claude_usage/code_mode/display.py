@@ -820,22 +820,21 @@ class UsageRenderer:
                 )
             )
 
-        # Clean code rules count with optional breakdown
+        # Clean code rules count with optional breakdown: total (default + custom - deleted)
         rules_count = pacemaker_status.get("clean_code_rules_count", 0)
         breakdown = pacemaker_status.get("clean_code_rules_breakdown")
         if rules_count > 0:
             if breakdown:
                 custom = breakdown.get("custom", 0)
                 deleted = breakdown.get("deleted", 0)
-                parts = []
-                if custom > 0:
-                    parts.append(f"[cyan]{custom} custom[/cyan]")
-                if deleted > 0:
-                    parts.append(f"[red]{deleted} del[/red]")
-                suffix = f" ({', '.join(parts)})" if parts else ""
-                plain_suffix = f" ({custom} custom, {deleted} del)" if parts else ""
-                plain_val = f"{rules_count}{plain_suffix}"
-                markup_val = f"[green]{rules_count}[/green]{suffix}"
+                defaults = rules_count - custom + deleted
+                plain_val = f"{rules_count} ({defaults} + {custom} - {deleted})"
+                markup_val = (
+                    f"[green]{rules_count}[/green]"
+                    f" ([green]{defaults}[/green]"
+                    f" + [cyan]{custom}[/cyan]"
+                    f" - [red]{deleted}[/red])"
+                )
                 left_lines.append(
                     self._fmt_kv("Rules:", plain_val, markup_val, status_col_width)
                 )
