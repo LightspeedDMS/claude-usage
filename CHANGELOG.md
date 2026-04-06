@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.8.1] - 2026-04-05
+
+### Fixed
+- **Danger bash blockage stats missing** (#58): Added `intent_validation_dangerbash` to hardcoded categories list in `get_blockage_stats()` — blockages were recorded in DB but silently dropped by the monitor query
+
+## [2.8.0] - 2026-04-05
+
+### Added
+- **Danger Bash status indicator** (#58): "Danger Bash: on/off" status line in monitor left column pacing status display
+- **Danger Bash rules count with breakdown** (#58): Shows merged rule count with compact math format (same pattern as clean code rules display); `DEFAULT_DANGER_BASH_RULES_COUNT = 55`
+- **"Danger Bash" blockage row** (#58): New row in blockage stats right column for `intent_validation_dangerbash` events
+- **Reviewer tags in governance event feed** (#60): Extracts `[REVIEWER:xxx]` tag from governance event feedback and displays colored reviewer identity — `[Codex]` yellow, `[SDK]` green, `[Gem]` cyan; backwards compatible with legacy events (no tag = no display)
+
+### Changed
+- **Hook Model PAYG display** (#59): Codex PAYG mode (`limit_id="premium"`) now displays in cyan; subscription mode preserves existing red/orange/yellow color coding based on usage thresholds
+- **`codex_limit_id` and `codex_plan_type`** (#59): Wired through `pacemaker_integration.py` status dict for downstream display consumption
+
 ## [2.7.0] - 2026-04-04
 
 ### Added
