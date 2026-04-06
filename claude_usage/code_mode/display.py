@@ -20,10 +20,11 @@ COLOR_ORANGE = "#ff8c00"  # Rich markup color for orange tier
 REVIEWER_TAGS = {
     "codex-gpt5": ("[Codex]", "yellow"),
     "anthropic-sdk": ("[SDK]", "green"),
+    "sdk-fallback": ("[SDK]", "green"),
     "gem-flash": ("[Gem]", "cyan"),
     "gem-pro": ("[Gem]", "cyan"),
 }
-_REVIEWER_TAG_RE = re.compile(r"\[REVIEWER:([^\]]+)\]")
+_REVIEWER_TAG_RE = re.compile(r"\[([^\]]+)\]")
 
 
 def _md_to_rich(text):
@@ -781,7 +782,23 @@ class UsageRenderer:
 
         # Hook inference model
         hook_model = pacemaker_status.get("hook_model", "auto")
-        if hook_model == "auto":
+        if "+" in hook_model and "->" in hook_model:
+            # Competitive mode: show "competitive" in blue with reviewer breakdown
+            _GEM_SHORT = {"gemini-flash": "gem-flash", "gemini-pro": "gem-pro"}
+            lhs, synthesizer = hook_model.split("->", 1)
+            reviewers = [_GEM_SHORT.get(r.strip(), r.strip()) for r in lhs.split("+")]
+            syn_display = _GEM_SHORT.get(synthesizer.strip(), synthesizer.strip())
+            left_lines.append(
+                self._fmt_kv(
+                    "Hook Model:",
+                    "competitive",
+                    "[blue]competitive[/blue]",
+                    status_col_width,
+                )
+            )
+            rev_str = ", ".join(reviewers) + " \u2192 " + syn_display
+            left_lines.append(f"  reviewers: {rev_str}")
+        elif hook_model == "auto":
             left_lines.append(
                 self._fmt_kv(
                     "Hook Model:", "auto", "[cyan]auto[/cyan]", status_col_width
@@ -1127,11 +1144,18 @@ class UsageRenderer:
             match = _REVIEWER_TAG_RE.search(feedback)
             if match:
                 reviewer_id = match.group(1)
+                strip_tag = False
                 tag_info = REVIEWER_TAGS.get(reviewer_id)
                 if tag_info:
                     tag_label, tag_color = tag_info
                     reviewer_markup = f" [{tag_color}]{tag_label}[/{tag_color}]"
-                    # Strip the tag from feedback only when recognized
+                    strip_tag = True
+                elif "+" in reviewer_id and "->" in reviewer_id:
+                    # Competitive expression — render as [Comp] in blue
+                    reviewer_markup = " [blue][Comp][/blue]"
+                    strip_tag = True
+                # Strip the tag from feedback when recognized (single-model or competitive)
+                if strip_tag:
                     feedback = (
                         feedback[: match.start()] + feedback[match.end() :]
                     ).lstrip()
