@@ -2,7 +2,8 @@
 Unit tests for reviewer identity tags in governance event feed display.
 
 Tests verify that [xxx] tags in feedback_text are parsed
-and displayed as colored tags: [Codex] yellow, [SDK] green, [Gem] cyan.
+and displayed as colored tags: [Codex] yellow, [SDK] green, [Gem] cyan,
+[Comp] bright_blue (visible on dark terminals).
 Legacy events without tags display normally (backwards compatible).
 """
 
@@ -16,6 +17,7 @@ from claude_usage.code_mode.display import UsageRenderer
 ANSI_YELLOW = "\x1b[33m"
 ANSI_GREEN = "\x1b[32m"
 ANSI_CYAN = "\x1b[36m"
+ANSI_BRIGHT_BLUE = "\x1b[94m"  # bright_blue — visible on dark terminal backgrounds
 
 # Default render width for all tests
 RENDER_WIDTH = 80
@@ -128,3 +130,18 @@ class TestReviewerTagDisplay:
         rendered = _render_event_feed(events)
         assert "Actual feedback here" in rendered
         assert "[codex-gpt5]" not in rendered
+
+    def test_competitive_reviewer_shows_bright_blue_tag(self):
+        """Competitive expression tag → [Comp] in bright_blue (visible on dark terminals)."""
+        events = [
+            {
+                "event_type": "CC",
+                "project_name": "myproj",
+                "session_id": "s1",
+                "feedback_text": "[gpt-5+gemini-flash->sonnet] Code review verdict",
+                "timestamp": time.time(),
+            }
+        ]
+        rendered = _render_event_feed(events)
+        assert "[Comp]" in rendered
+        assert f"{ANSI_BRIGHT_BLUE}[Comp]" in rendered

@@ -1151,8 +1151,8 @@ class UsageRenderer:
                     reviewer_markup = f" [{tag_color}]{tag_label}[/{tag_color}]"
                     strip_tag = True
                 elif "+" in reviewer_id and "->" in reviewer_id:
-                    # Competitive expression — render as [Comp] in blue
-                    reviewer_markup = " [blue][Comp][/blue]"
+                    # Competitive expression — render as [Comp] in bright_blue (visible on dark terminals)
+                    reviewer_markup = " [bright_blue][Comp][/bright_blue]"
                     strip_tag = True
                 # Strip the tag from feedback when recognized (single-model or competitive)
                 if strip_tag:
