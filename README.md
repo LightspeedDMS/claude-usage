@@ -299,6 +299,8 @@ Optional integration with [Claude Pace Maker](https://github.com/LightspeedDMS/c
 - TDD enforcement (on/off)
 - Model preference (auto/opus/sonnet/haiku)
 - Clean code rules count
+- Danger bash rules count (with breakdown)
+- Danger bash validation (on/off)
 - **Pace Maker version** (e.g., v1.5.0)
 - **Usage Console version** (e.g., v1.1.0)
 - **24-hour error count** (color-coded: green=0, yellow=1-10, red=>10)
@@ -307,8 +309,17 @@ Optional integration with [Claude Pace Maker](https://github.com/LightspeedDMS/c
 - Intent validation blocks
 - TDD enforcement blocks
 - Clean code violations
+- Danger bash blocks
 - Pacing tempo blocks
 - Pacing quota blocks
+
+**Codex Hook Model Display:**
+- Subscription mode: Color-coded by usage (green/yellow/orange/red)
+- PAYG mode (`limit_id="premium"`): Displayed in cyan
+
+**Governance Event Feed Reviewer Tags:**
+- `[Codex]` (yellow), `[SDK]` (green), `[Gem]` (cyan) — extracted from `[REVIEWER:xxx]` tags in event feedback
+- Backwards compatible with legacy events without reviewer tags
 
 **Langfuse Metrics:**
 - Sessions created (24h)
@@ -358,6 +369,11 @@ curl -I https://api.anthropic.com
 Contributions welcome! Please open an issue or submit a pull request.
 
 ## Changelog
+
+### v2.8.0 (April 2026)
+- **Danger Bash Display**: Status indicator, rules count with breakdown, and blockage row for danger bash validation
+- **Codex PAYG Billing Display**: Hook Model field displays cyan for PAYG mode; subscription mode retains threshold-based colors
+- **Reviewer Tags in Governance Feed**: Colored reviewer identity tags (`[Codex]` yellow, `[SDK]` green, `[Gem]` cyan) extracted from governance events
 
 ### v2.2.0 (March 2026)
 - **Green Coefficient Highlighting**: Overridden pacing coefficients now display in green instead of grey, making it easy to distinguish calibrated values from defaults at a glance

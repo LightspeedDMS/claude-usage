@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.2] - 2026-04-05
+
+### Fixed
+- **Gemini hook model display** (#54): Hook model column now shows `gem-flash`/`gem-pro` (short names) instead of raw `gemini-flash`/`gemini-pro` strings
+- **Gemini reviewer tags** (#54): `REVIEWER_TAGS` updated with `gem-flash` and `gem-pro` keys replacing old `gemini` key; `[Gem]` label displayed in cyan in governance event feed
+- **Gemini hook model color** (#54): `gemini` hook models now rendered in cyan in the Hook Model display column, matching reviewer tag color
+
 ## [2.8.1] - 2026-04-05
 
 ### Fixed

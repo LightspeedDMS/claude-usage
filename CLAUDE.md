@@ -69,6 +69,42 @@ Live-updating terminal dashboard for monitoring Claude Code and Anthropic Consol
 7. Updates every 5 minutes
 8. Errors displayed with red border and warning messages
 
+## Danger Bash Display
+
+The monitor displays danger bash validation status from pace-maker in the left column pacing status section:
+
+- **"Danger Bash: on/off"**: Status indicator read from `danger_bash_enabled` in pace-maker config
+- **Rules count with breakdown**: Shows merged rule count using compact math format (e.g., `55 (55 + 0 - 0)`) with green defaults, cyan custom, red deleted — same display pattern as clean code rules
+- **Blockage row**: "Danger Bash" row in the right column blockage stats for `intent_validation_dangerbash` events
+
+**Key constant**: `DEFAULT_DANGER_BASH_RULES_COUNT = 55` in `pacemaker_integration.py`
+
+---
+
+## Codex PAYG Billing Display
+
+Hook Model field color-coding handles both subscription and PAYG Codex billing:
+
+- **PAYG mode** (`codex_limit_id == "premium"`): Displays in **cyan** — no usage percentage available for PAYG plans
+- **Subscription mode**: Preserves existing threshold-based coloring — green (<=50%), yellow (51-75%), orange (76-95%), red (>95%)
+
+The `codex_limit_id` and `codex_plan_type` fields are read from pace-maker's `codex_usage` SQLite table via `pacemaker_integration.py`.
+
+---
+
+## Reviewer Tags in Governance Event Feed
+
+The governance event feed displays reviewer identity extracted from `[REVIEWER:xxx]` tags in event feedback text:
+
+- **`[Codex]`**: Yellow — indicates GPT-5 Codex was the reviewing model
+- **`[SDK]`**: Green — indicates Anthropic SDK (Claude) was the reviewing model
+- **`[Gem]`**: Cyan — indicates Gemini was the reviewing model
+- **No tag**: Legacy events without reviewer identity display normally (backwards compatible)
+
+Reviewer tag extraction uses the `_REVIEWER_TAG_RE` regex pattern in `display.py`, matching against the `REVIEWER_TAGS` lookup dict.
+
+---
+
 ## Technologies
 
 - **Rich**: Terminal UI with progress bars and live updates
