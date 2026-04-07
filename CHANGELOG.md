@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.11.0] - 2026-04-07
+
+### Added
+- **Competitive expression subtitle** (#63): Hook Model column now shows the full expression (e.g. `opus+gpt-5->haiku`) as a second line in `bright_blue` below the `comp` label
+
 ## [2.9.0] - 2026-04-06
 
 ### Added

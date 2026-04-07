@@ -793,6 +793,8 @@ class UsageRenderer:
                     status_col_width,
                 )
             )
+            hook_model_escaped = hook_model.replace("[", "\\[")
+            left_lines.append(f"  [bright_blue]{hook_model_escaped}[/bright_blue]")
         elif hook_model == "auto":
             left_lines.append(
                 self._fmt_kv(
