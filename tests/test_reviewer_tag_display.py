@@ -2,8 +2,8 @@
 Unit tests for reviewer identity tags in governance event feed display.
 
 Tests verify that [xxx] tags in feedback_text are parsed
-and displayed as colored tags: [Codex] yellow, [SDK] green, [Gem] cyan,
-[Comp] bright_blue (visible on dark terminals).
+and displayed as colored tags: [RegEx] red, [Codex] yellow, [SDK] green,
+[Gem] cyan, [Comp] bright_blue (visible on dark terminals).
 Legacy events without tags display normally (backwards compatible).
 """
 
@@ -14,6 +14,7 @@ from rich.console import Console
 from claude_usage.code_mode.display import UsageRenderer
 
 # Named ANSI escape code constants for color assertions
+ANSI_RED = "\x1b[31m"
 ANSI_YELLOW = "\x1b[33m"
 ANSI_GREEN = "\x1b[32m"
 ANSI_CYAN = "\x1b[36m"
@@ -145,3 +146,25 @@ class TestReviewerTagDisplay:
         rendered = _render_event_feed(events)
         assert "[Comp]" in rendered
         assert f"{ANSI_BRIGHT_BLUE}[Comp]" in rendered
+
+    def test_regex_reviewer_shows_red_tag(self):
+        """[RegEx] → [RegEx] in red in event header (Stage 1 regex-blocked events)."""
+        events = [
+            {
+                "event_type": "IV",
+                "project_name": "myproj",
+                "session_id": "s1",
+                "feedback_text": "[RegEx] Intent declaration required",
+                "timestamp": time.time(),
+            }
+        ]
+        rendered = _render_event_feed(events)
+        assert "[RegEx]" in rendered
+        assert f"{ANSI_RED}[RegEx]" in rendered
+
+    def test_regex_tag_in_reviewer_tags_dict(self):
+        """REVIEWER_TAGS must map 'RegEx' to ('[RegEx]', 'red')."""
+        from claude_usage.code_mode.display import REVIEWER_TAGS
+
+        assert "RegEx" in REVIEWER_TAGS
+        assert REVIEWER_TAGS["RegEx"] == ("[RegEx]", "red")

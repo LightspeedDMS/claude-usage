@@ -18,6 +18,7 @@ COLOR_ORANGE = "#ff8c00"  # Rich markup color for orange tier
 
 # Reviewer identity tags for governance event feed display
 REVIEWER_TAGS = {
+    "RegEx": ("[RegEx]", "red"),
     "codex-gpt5": ("[Codex]", "yellow"),
     "anthropic-sdk": ("[SDK]", "green"),
     "sdk-fallback": ("[SDK]", "green"),
