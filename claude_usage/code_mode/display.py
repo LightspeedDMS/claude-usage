@@ -783,21 +783,15 @@ class UsageRenderer:
         # Hook inference model
         hook_model = pacemaker_status.get("hook_model", "auto")
         if "+" in hook_model and "->" in hook_model:
-            # Competitive mode: show "competitive" in blue with reviewer breakdown
-            _GEM_SHORT = {"gemini-flash": "gem-flash", "gemini-pro": "gem-pro"}
-            lhs, synthesizer = hook_model.split("->", 1)
-            reviewers = [_GEM_SHORT.get(r.strip(), r.strip()) for r in lhs.split("+")]
-            syn_display = _GEM_SHORT.get(synthesizer.strip(), synthesizer.strip())
+            # Competitive mode: show compact "comp" label in bright_blue
             left_lines.append(
                 self._fmt_kv(
                     "Hook Model:",
-                    "competitive",
-                    "[blue]competitive[/blue]",
+                    "comp",
+                    "[bright_blue]comp[/bright_blue]",
                     status_col_width,
                 )
             )
-            rev_str = ", ".join(reviewers) + " \u2192 " + syn_display
-            left_lines.append(f"  reviewers: {rev_str}")
         elif hook_model == "auto":
             left_lines.append(
                 self._fmt_kv(
