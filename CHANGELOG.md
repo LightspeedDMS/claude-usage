@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.9.0] - 2026-04-06
+
+### Added
+- **Competitive hook model display** (#63): Hook Model column shows `comp` in `bright_blue` when a competitive expression (`m1+m2->synthesizer`) is configured — compact and readable on dark backgrounds
+
+### Changed
+- **`[Comp]` governance tag color** (#63): Changed from dark `blue` to `bright_blue` for readability on dark terminal backgrounds
+- **Bracket reviewer tag format** (#63): Competitive expressions displayed as `[expression]` (e.g. `[opus+gpt-5->haiku]`) in governance event feed instead of `REVIEWER:` prefix format
+
 ## [2.8.2] - 2026-04-05
 
 ### Fixed
