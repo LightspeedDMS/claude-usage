@@ -31,12 +31,12 @@ from claude_usage.code_mode.pacemaker_integration import (
 class TestDefaultCleanCodeRulesCount(unittest.TestCase):
     """DEFAULT_CLEAN_CODE_RULES_COUNT constant must reflect current rule count."""
 
-    def test_default_clean_code_rules_count_is_25(self):
-        """Constant must be 25, not the stale value of 17."""
+    def test_default_clean_code_rules_count_is_20(self):
+        """Constant must be 20, matching current pace-maker rule count."""
         self.assertEqual(
             DEFAULT_CLEAN_CODE_RULES_COUNT,
-            25,
-            "DEFAULT_CLEAN_CODE_RULES_COUNT must be updated to 25 (was 17)",
+            20,
+            "DEFAULT_CLEAN_CODE_RULES_COUNT must be 20",
         )
 
 

@@ -295,16 +295,17 @@ class TestBlockageStatsHumanReadableLabels(unittest.TestCase):
         result = self.reader.get_blockage_stats_with_labels()
         # Note: 'Other' is excluded from labels as it's a rarely-used catch-all category
         expected_labels = [
-            "Intent Validation",
+            "Intent Val.",
             "Intent TDD",
             "Clean Code",
+            "Danger Bash",
             "Pacing Tempo",
             "Pacing Quota",
             "Total",
         ]
         for label in expected_labels:
             self.assertIn(label, result)
-        self.assertEqual(result["Intent Validation"], 1)
+        self.assertEqual(result["Intent Val."], 1)
 
 
 class TestBlockageStatsCaching(unittest.TestCase):
