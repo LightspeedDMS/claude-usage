@@ -58,6 +58,7 @@ class TestGetCleanCodeRulesCountReload(unittest.TestCase):
         """Create a fake pacemaker.clean_code_rules module with N rules."""
         mod = types.ModuleType("pacemaker.clean_code_rules")
         mod.get_default_rules = lambda: [{"id": f"rule-{i}"} for i in range(rule_count)]
+        mod.load_rules = lambda config_path: [{"id": f"rule-{i}"} for i in range(rule_count)]
         return mod
 
     def test_get_clean_code_rules_count_reflects_reloaded_module(self):

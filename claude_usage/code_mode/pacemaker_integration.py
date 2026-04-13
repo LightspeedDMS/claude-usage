@@ -31,9 +31,7 @@ DB_TIMEOUT = 5.0
 CODEX_USAGE_ROW_ID = 1
 
 
-PLUGIN_CACHE_RELATIVE = (
-    "plugins/cache/lightspeed-claude-plugins/claude-pace-maker"
-)
+PLUGIN_CACHE_RELATIVE = "plugins/cache/lightspeed-claude-plugins/claude-pace-maker"
 
 
 def _parse_version_tuple(version_str: str) -> tuple:
