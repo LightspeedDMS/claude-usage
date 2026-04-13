@@ -31,6 +31,61 @@ DB_TIMEOUT = 5.0
 CODEX_USAGE_ROW_ID = 1
 
 
+PLUGIN_CACHE_RELATIVE = (
+    "plugins/cache/lightspeed-claude-plugins/claude-pace-maker"
+)
+
+
+def _parse_version_tuple(version_str: str) -> tuple:
+    """Parse a version string like '2.18.0' into a comparable tuple of ints.
+
+    Non-numeric segments are treated as 0 so the function never raises.
+    """
+    parts = []
+    for segment in version_str.split("."):
+        try:
+            parts.append(int(segment))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
+def _find_plugin_cache_src(claude_dir: Path) -> Optional[Path]:
+    """Find pace-maker src directory inside the Claude plugin cache.
+
+    Scans ``<claude_dir>/plugins/cache/lightspeed-claude-plugins/
+    claude-pace-maker/<version>/src`` and returns the src path from the
+    highest version that contains a valid ``src`` directory.
+
+    Args:
+        claude_dir: Path to the ``~/.claude`` directory.
+
+    Returns:
+        Path to the ``src`` directory of the latest cached version,
+        or ``None`` if none is found.
+    """
+    plugin_base = claude_dir / PLUGIN_CACHE_RELATIVE
+    if not plugin_base.is_dir():
+        return None
+
+    candidates = []
+    for entry in plugin_base.iterdir():
+        if not entry.is_dir():
+            continue
+        version_tuple = _parse_version_tuple(entry.name)
+        if not version_tuple or version_tuple == (0,):
+            continue
+        src_dir = entry / "src"
+        if src_dir.is_dir():
+            candidates.append((version_tuple, src_dir))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda c: c[0])
+    return candidates[-1][1]
+
+
 def _is_pipx_installation(install_path: str) -> bool:
     """Check if installation path indicates pipx installation
 
@@ -133,9 +188,13 @@ class PaceMakerReader:
         if not pm_src or not pm_src.exists():
             pm_src = self.pm_dir / "src"
 
-        # Return None if path doesn't exist
         if pm_src and pm_src.exists():
             return pm_src
+
+        # Fallback: check Claude plugin cache
+        plugin_src = _find_plugin_cache_src(Path.home() / ".claude")
+        if plugin_src:
+            return plugin_src
 
         return None
 
