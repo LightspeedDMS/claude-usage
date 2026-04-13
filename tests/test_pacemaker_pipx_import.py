@@ -252,6 +252,20 @@ class TestPaceMakerPipxImport(unittest.TestCase):
         with open(install_source_file, "w") as f:
             f.write(str(dev_path))
 
+        # Mock UsageModel (used by _get_latest_usage) to return a snapshot
+        mock_snapshot = MagicMock()
+        mock_snapshot.timestamp = datetime.utcnow().timestamp()
+        mock_snapshot.five_hour_util = 65.0
+        mock_snapshot.five_hour_resets_at = datetime.utcnow().isoformat()
+        mock_snapshot.seven_day_util = 45.0
+        mock_snapshot.seven_day_resets_at = datetime.utcnow().isoformat()
+
+        mock_usage_model_cls = MagicMock()
+        mock_usage_model_cls.return_value.get_current_usage.return_value = mock_snapshot
+
+        mock_usage_model_module = MagicMock()
+        mock_usage_model_module.UsageModel = mock_usage_model_cls
+
         # Mock the pacing_engine module
         mock_pacing_module = MagicMock()
         mock_pacing_module.calculate_pacing_decision.return_value = {
@@ -269,13 +283,16 @@ class TestPaceMakerPipxImport(unittest.TestCase):
             "deviation_percent": 15.0,
             "should_throttle": True,
             "delay_seconds": 10,
-
             "strategy": "preload",
         }
 
         with patch.dict(
             "sys.modules",
-            {"pacemaker": MagicMock(), "pacemaker.pacing_engine": mock_pacing_module},
+            {
+                "pacemaker": MagicMock(),
+                "pacemaker.usage_model": mock_usage_model_module,
+                "pacemaker.pacing_engine": mock_pacing_module,
+            },
         ):
             status = self.reader.get_status()
 
