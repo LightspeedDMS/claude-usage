@@ -716,19 +716,28 @@ class UsageRenderer:
                 )
             )
 
-        # Langfuse status
+        # Langfuse status (compact: on/off + connectivity indicator on same line)
         langfuse_enabled = pacemaker_status.get("langfuse_enabled", False)
         if langfuse_enabled:
-            left_lines.append(
-                self._fmt_kv("Langfuse:", "on", "[green]on[/green]", status_col_width)
-            )
-            # Add connectivity status (indented - NOT reformatted)
             langfuse_conn = pacemaker_status.get("langfuse_connection", {})
             if langfuse_conn.get("connected"):
-                left_lines.append("  [green]✓ Connected[/green]")
+                left_lines.append(
+                    self._fmt_kv(
+                        "Langfuse:",
+                        "on ✓",
+                        "[green]on[/green] [green]✓[/green]",
+                        status_col_width,
+                    )
+                )
             else:
-                msg = langfuse_conn.get("message", "Unknown error")
-                left_lines.append(f"  [red]✗ {msg}[/red]")
+                left_lines.append(
+                    self._fmt_kv(
+                        "Langfuse:",
+                        "on ✗",
+                        "[green]on[/green] [red]✗[/red]",
+                        status_col_width,
+                    )
+                )
         else:
             left_lines.append(
                 self._fmt_kv(
@@ -764,6 +773,14 @@ class UsageRenderer:
                     status_col_width,
                 )
             )
+
+        # Cross-Session Awareness status (default True matches pacemaker_integration.py default)
+        csa_enabled = pacemaker_status.get("cross_session_awareness_enabled", True)
+        raw_csa = "on" if csa_enabled else "off"
+        fmt_csa = "[green]on[/green]" if csa_enabled else "[yellow]off[/yellow]"
+        left_lines.append(
+            self._fmt_kv("Cross-Session:", raw_csa, fmt_csa, status_col_width)
+        )
 
         # Subagent model preference
         preferred_model = pacemaker_status.get("preferred_subagent_model", "auto")

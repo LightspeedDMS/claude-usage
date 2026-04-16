@@ -301,6 +301,9 @@ class PaceMakerReader:
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
                 "danger_bash_enabled": config.get("danger_bash_enabled", True),
+                "cross_session_awareness_enabled": config.get(
+                    "cross_session_awareness_enabled", True
+                ),
                 "danger_bash_rules_count": self._get_danger_bash_rules_count(),
                 "danger_bash_rules_breakdown": self._get_danger_bash_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
@@ -365,6 +368,9 @@ class PaceMakerReader:
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
                 "danger_bash_enabled": config.get("danger_bash_enabled", True),
+                "cross_session_awareness_enabled": config.get(
+                    "cross_session_awareness_enabled", True
+                ),
                 "danger_bash_rules_count": self._get_danger_bash_rules_count(),
                 "danger_bash_rules_breakdown": self._get_danger_bash_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
@@ -454,6 +460,9 @@ class PaceMakerReader:
                 "clean_code_rules_count": self._get_clean_code_rules_count(),
                 "clean_code_rules_breakdown": self._get_clean_code_rules_breakdown(),
                 "danger_bash_enabled": config.get("danger_bash_enabled", True),
+                "cross_session_awareness_enabled": config.get(
+                    "cross_session_awareness_enabled", True
+                ),
                 "danger_bash_rules_count": self._get_danger_bash_rules_count(),
                 "danger_bash_rules_breakdown": self._get_danger_bash_rules_breakdown(),
                 "log_level": config.get("log_level", DEFAULT_LOG_LEVEL),
