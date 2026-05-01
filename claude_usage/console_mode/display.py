@@ -1,12 +1,86 @@
 """UI rendering for Console mode usage monitor"""
 
-from rich.panel import Panel
 from rich.text import Text
 from rich.console import Group
+
+from .constants import ADMIN_KEYS_URL, CREDENTIALS_PATH_HINT
 
 
 class ConsoleRenderer:
     """Renders Console API usage data with MTD display"""
+
+    def render_settings_panel(self, settings_info):
+        """Render account/org settings info panel.
+
+        Args:
+            settings_info: dict with keys email, org_name, org_role,
+                billing_type, account_created_at, primary_api_key_present,
+                admin_api_key_source.  Any field may be None.
+
+        Returns:
+            Rich Group renderable.
+        """
+        lines = []
+
+        email = settings_info.get("email") if settings_info is not None else None
+        org_name = settings_info.get("org_name") if settings_info is not None else None
+        org_role = settings_info.get("org_role") if settings_info is not None else None
+        billing_type = (
+            settings_info.get("billing_type") if settings_info is not None else None
+        )
+        primary_api_key_present = (
+            settings_info.get("primary_api_key_present", False)
+            if settings_info is not None
+            else False
+        )
+        admin_api_key_source = (
+            settings_info.get("admin_api_key_source")
+            if settings_info is not None
+            else None
+        )
+
+        email_str = email if email else "(email unavailable)"
+        lines.append(Text(f"📧 {email_str}"))
+
+        org_str = org_name if org_name else "(organization unavailable)"
+        lines.append(Text(f"🏢 {org_str}"))
+
+        if org_role:
+            lines.append(Text(f"🎭 Role: {org_role}"))
+        else:
+            lines.append(Text("🎭 Role: (unavailable)", style="dim"))
+
+        if billing_type == "usage_based":
+            billing_style = "cyan"
+        elif billing_type == "subscription":
+            billing_style = "green"
+        elif billing_type:
+            billing_style = ""
+        else:
+            billing_style = "dim"
+        billing_str = billing_type if billing_type else "(unavailable)"
+        lines.append(Text(f"💳 Billing: {billing_str}", style=billing_style))
+
+        if primary_api_key_present:
+            suffix = (
+                settings_info.get("primary_api_key_suffix")
+                if settings_info is not None
+                else None
+            )
+            if suffix:
+                primary_str = f"set in ~/.claude.json (…{suffix})"
+            else:
+                primary_str = "set in ~/.claude.json"
+        else:
+            primary_str = "not set"
+        lines.append(Text(f"🔑 Primary API key: {primary_str}"))
+
+        if admin_api_key_source:
+            lines.append(Text(f"🔐 Admin API key: {admin_api_key_source}"))
+        else:
+            lines.append(Text("🔐 Admin API key: not configured"))
+
+        return Group(*lines)
 
     def render(
         self,
@@ -16,9 +90,15 @@ class ConsoleRenderer:
         last_update,
         projection,
         error=None,
+        settings_info=None,
     ):
         """Generate rich display for Console API usage"""
         content = []
+
+        # Settings panel shown whenever settings_info is available (not None)
+        if settings_info is not None:
+            content.append(self.render_settings_panel(settings_info))
+            content.append(Text(""))
 
         # Organization info
         if org_data:
@@ -34,7 +114,43 @@ class ConsoleRenderer:
         # Show errors prominently
         if error:
             content.append(Text(""))
-            content.append(Text(f"⚠️  {error}", style="bold red"))
+            # Show friendly admin-key guidance when settings_info is present
+            # (is not None) AND the source indicates no real admin key is
+            # configured: either None (no key at all) or "claude_json_primary"
+            # (primary API key used as fallback — not a real admin key).
+            # If settings_info is absent, fall back to the generic error line.
+            admin_key_source = (
+                settings_info.get("admin_api_key_source")
+                if settings_info is not None
+                else "unknown"
+            )
+            no_real_admin_key = admin_key_source is None
+            if settings_info is not None and no_real_admin_key:
+                content.append(
+                    Text(
+                        '⚠️  MTD usage data requires an Admin API key (role "admin" can create one)',
+                        style="bold yellow",
+                    )
+                )
+                content.append(Text(f"  1. Generate at: {ADMIN_KEYS_URL}", style="dim"))
+                content.append(Text("  2. Either set env var:", style="dim"))
+                content.append(
+                    Text(
+                        "       export ANTHROPIC_ADMIN_API_KEY=sk-ant-admin-...",
+                        style="dim",
+                    )
+                )
+                content.append(
+                    Text(f"     Or add to {CREDENTIALS_PATH_HINT}:", style="dim")
+                )
+                content.append(
+                    Text(
+                        '       {"anthropicConsole": {"adminApiKey": "sk-ant-admin-..."}}',
+                        style="dim",
+                    )
+                )
+            else:
+                content.append(Text(f"⚠️  {error}", style="bold red"))
             content.append(Text(""))
 
         # Show loading message if no content yet
@@ -42,9 +158,7 @@ class ConsoleRenderer:
             content.append(Text("Loading...", style="dim"))
 
         # Combine content
-        display = Group(*content)
-        border_color = "red" if error else "green"
-        return Panel(display, title="Console Usage", border_style=border_color)
+        return Group(*content)
 
     def _format_tokens(self, count):
         """Format token count with K/M suffix"""

@@ -64,9 +64,29 @@ def detect_mode(credentials_path):
     except Exception:
         pass
 
-    # Check environment variable (lowest priority)
+    # Check environment variable (next-to-last priority)
     if os.environ.get("ANTHROPIC_ADMIN_API_KEY"):
         return "console", None
+
+    # Check ~/.claude.json primaryApiKey (lowest priority — Anthropic Console PAYG users).
+    # These users log into Claude Code via Anthropic Console (usage-based billing) and have
+    # no claudeAiOauth entry; their key lives in ~/.claude.json as primaryApiKey.
+    try:
+        claude_json_path = Path.home() / ".claude.json"
+        with open(claude_json_path) as f:
+            claude_json = json.load(f)
+        primary_key = claude_json.get("primaryApiKey")
+        if isinstance(primary_key, str) and primary_key:
+            return "console", None
+    except FileNotFoundError:
+        # ~/.claude.json does not exist — not an error; many users don't have this file.
+        pass
+    except json.JSONDecodeError:
+        # File exists but is not valid JSON — cannot use it; fall through to error return.
+        pass
+    except OSError:
+        # Permission denied or other OS-level read failure — cannot use it; fall through.
+        pass
 
     # No credentials found
     return None, "No credentials found"

@@ -23,32 +23,38 @@ class AdminAuthManager:
                 return None, None, f"Invalid Admin API key format: {validation_error}"
             return env_key, "environment", None
 
-        # Fall back to credentials file
+        # Fall back to credentials file.
+        # Missing file, corrupt JSON, non-dict root, or I/O error all mean
+        # "source not available" — discard and fall through to the next source.
         try:
-            if not self.credentials_path.exists():
-                return None, None, "Admin API key not found"
+            if self.credentials_path.exists():
+                with open(self.credentials_path) as f:
+                    data = json.load(f)
 
-            with open(self.credentials_path) as f:
-                data = json.load(f)
+                if isinstance(data, dict):
+                    console_config = data.get("anthropicConsole", {})
+                    if isinstance(console_config, dict):
+                        file_key = console_config.get("adminApiKey", "")
+                        if file_key:
+                            is_valid, validation_error = self.validate_admin_key(
+                                file_key
+                            )
+                            if not is_valid:
+                                return (
+                                    None,
+                                    None,
+                                    f"Invalid Admin API key format: {validation_error}",
+                                )
+                            return file_key, "credentials_file", None
 
-            if "anthropicConsole" not in data:
-                return None, None, "Admin API key not found"
+        except FileNotFoundError:
+            pass  # credentials file absent — source not available, try next source
+        except json.JSONDecodeError:
+            pass  # credentials file malformed — source not usable, try next source
+        except OSError:
+            pass  # permission/I/O error — source not accessible, try next source
 
-            console_config = data["anthropicConsole"]
-            if "adminApiKey" not in console_config:
-                return None, None, "Admin API key not found"
-
-            file_key = console_config["adminApiKey"]
-
-            # Validate format
-            is_valid, validation_error = self.validate_admin_key(file_key)
-            if not is_valid:
-                return None, None, f"Invalid Admin API key format: {validation_error}"
-
-            return file_key, "credentials_file", None
-
-        except Exception as e:
-            return None, None, f"Failed to load credentials: {e}"
+        return None, None, "Admin API key not found"
 
     def validate_admin_key(self, key):
         """Validate Admin API key format

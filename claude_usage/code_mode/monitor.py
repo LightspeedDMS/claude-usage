@@ -15,6 +15,7 @@ from .api import ClaudeAPIClient
 from .storage import CodeStorage, CodeAnalytics
 from .display import UsageRenderer
 from .pacemaker_integration import PaceMakerReader
+from claude_usage.shared.pacemaker_fetcher import fetch_pacemaker_bundle
 
 console = Console()
 
@@ -257,75 +258,26 @@ class CodeMonitor:
 
     def get_display(self):
         """Generate rich display for current usage"""
-        # Get pace-maker status if installed
+        # Get pace-maker status, stats, metrics, and events via shared helper
+        weekly_limit_enabled = True  # Default when pace-maker not installed
         pacemaker_status = None
-        weekly_limit_enabled = True  # Default
         blockage_stats = None
         langfuse_metrics = None
         secrets_metrics = None
-        if self.pacemaker_reader.is_installed():
-            pacemaker_status = self.pacemaker_reader.get_status()
+        activity_events = None
+        bundle = fetch_pacemaker_bundle(
+            self.pacemaker_reader, include_weekly_limit=True
+        )
+        if bundle is not None:
+            pacemaker_status = bundle.pacemaker_status
+            blockage_stats = bundle.blockage_stats
+            langfuse_metrics = bundle.langfuse_metrics
+            secrets_metrics = bundle.secrets_metrics
+            activity_events = bundle.activity_events
             if pacemaker_status:
                 weekly_limit_enabled = pacemaker_status.get(
                     "weekly_limit_enabled", True
                 )
-                # CRITICAL-1c: Inject Langfuse status into pacemaker_status
-                pacemaker_status["langfuse_enabled"] = (
-                    self.pacemaker_reader.get_langfuse_status()
-                )
-                # Test Langfuse connection
-                pacemaker_status["langfuse_connection"] = (
-                    self.pacemaker_reader.test_langfuse_connection()
-                )
-                # Get versions
-                pacemaker_status["pacemaker_version"] = (
-                    self.pacemaker_reader.get_pacemaker_version()
-                )
-                # Usage console version
-                try:
-                    from claude_usage import __version__ as uc_version
-
-                    pacemaker_status["usage_console_version"] = uc_version
-                except ImportError:
-                    pacemaker_status["usage_console_version"] = "unknown"
-                # Error count
-                pacemaker_status["error_count_24h"] = (
-                    self.pacemaker_reader.get_recent_error_count(24)
-                )
-                # API backoff status
-                try:
-                    import sys
-
-                    pm_src = self.pacemaker_reader._get_pacemaker_src_path()
-                    if pm_src and str(pm_src) not in sys.path:
-                        sys.path.insert(0, str(pm_src))
-                    from pacemaker.usage_model import UsageModel
-
-                    model = UsageModel()
-                    if model.is_in_backoff():
-                        pacemaker_status["api_backoff_remaining"] = (
-                            model.get_backoff_remaining()
-                        )
-                    else:
-                        pacemaker_status["api_backoff_remaining"] = 0
-                except (ImportError, Exception):
-                    pacemaker_status["api_backoff_remaining"] = 0
-            # Fetch blockage stats for the two-column bottom section
-            blockage_stats = self.pacemaker_reader.get_blockage_stats_with_labels()
-            # CRITICAL-1b: Fetch Langfuse metrics
-            langfuse_metrics = self.pacemaker_reader.get_langfuse_metrics()
-            # Fetch Secrets metrics
-            secrets_metrics = self.pacemaker_reader.get_secrets_metrics()
-
-        # Fetch activity events for the activity line (rendered inside main_display)
-        activity_events = None
-        if pacemaker_status:
-            try:
-                activity_events = self.pacemaker_reader.get_recent_activity(
-                    window_seconds=10
-                )
-            except Exception as e:
-                logging.debug("Activity events fetch failed: %s", e)
 
         main_display = self.renderer.render(
             self.error_message,

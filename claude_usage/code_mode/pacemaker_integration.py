@@ -1035,32 +1035,41 @@ class PaceMakerReader:
         Returns:
             Version string like "1.4.0" or "unknown"
         """
-        try:
-            import sys
+        import importlib
+        import sys
 
-            # Get pace-maker source directory
-            pm_src = self._get_pacemaker_src_path()
-            if not pm_src:
-                return "unknown"
-
-            # Add to path if not already present
+        pm_src = self._get_pacemaker_src_path()
+        if pm_src:
             if str(pm_src) not in sys.path:
                 sys.path.insert(0, str(pm_src))
 
             # Reload pacemaker package if already cached so version changes after
             # ./install.sh are picked up without restarting the monitor.
-            import importlib
-
             if "pacemaker" in sys.modules:
                 try:
                     importlib.reload(sys.modules["pacemaker"])
-                except (TypeError, AttributeError, ImportError):
-                    pass  # Reload failed (e.g., mock in tests); use cached module
+                except (TypeError, AttributeError, ImportError) as exc:
+                    logging.debug(
+                        "pacemaker reload failed, using cached module: %s", exc
+                    )
 
-            from pacemaker import __version__
+            try:
+                from pacemaker import __version__
 
-            return __version__
-        except ImportError:
+                return __version__
+            except ImportError:
+                logging.debug(
+                    "pacemaker __version__ not importable; falling back to metadata"
+                )
+
+        # Fallback: works for any pip/pipx install even before install.sh runs
+        try:
+            from importlib.metadata import PackageNotFoundError
+            from importlib.metadata import version as _meta_version
+
+            return _meta_version("claude_pace_maker")
+        except (ImportError, PackageNotFoundError) as exc:
+            logging.debug("claude_pace_maker metadata not found: %s", exc)
             return "unknown"
 
     def get_governance_events(self, window_seconds: int = 3600) -> list:

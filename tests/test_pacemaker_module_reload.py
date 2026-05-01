@@ -178,17 +178,49 @@ class TestGetPacemakerVersionReload(unittest.TestCase):
             "expected 2.4.0 but got stale version. importlib.reload() may be missing.",
         )
 
-    def test_get_pacemaker_version_returns_unknown_when_not_installed(self):
-        """When pacemaker package cannot be imported, return 'unknown'."""
+    def test_get_pacemaker_version_uses_metadata_when_src_path_not_found(self):
+        """When no pace-maker source directory is locatable, fall back to importlib.metadata."""
+        import tempfile
+
         sys.modules.pop("pacemaker", None)
 
-        with patch.object(self.reader, "_get_pacemaker_src_path", return_value=None):
-            version = self.reader.get_pacemaker_version()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self.reader.pm_dir = Path(tmpdir)
+            # _find_plugin_cache_src is the module-level filesystem search for
+            # the Claude plugin cache; patch it so the temp dir has no fallback.
+            with patch(
+                "claude_usage.code_mode.pacemaker_integration._find_plugin_cache_src",
+                return_value=None,
+            ):
+                with patch("importlib.metadata.version", return_value="2.5.1") as mock_meta:
+                    version = self.reader.get_pacemaker_version()
+
+        mock_meta.assert_called_once_with("claude_pace_maker")
+        self.assertEqual(version, "2.5.1")
+
+    def test_get_pacemaker_version_returns_unknown_when_not_installed(self):
+        """When no source is locatable AND metadata unavailable, return 'unknown'."""
+        import tempfile
+        from importlib.metadata import PackageNotFoundError
+
+        sys.modules.pop("pacemaker", None)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self.reader.pm_dir = Path(tmpdir)
+            with patch(
+                "claude_usage.code_mode.pacemaker_integration._find_plugin_cache_src",
+                return_value=None,
+            ):
+                with patch(
+                    "importlib.metadata.version",
+                    side_effect=PackageNotFoundError("claude_pace_maker"),
+                ):
+                    version = self.reader.get_pacemaker_version()
 
         self.assertEqual(
             version,
             "unknown",
-            "Should return 'unknown' when pacemaker is not installed",
+            "Should return 'unknown' when pacemaker is not installed and metadata unavailable",
         )
 
     def tearDown(self):
