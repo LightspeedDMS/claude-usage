@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.17.0] - 2026-05-13
+
+### Fixed
+- **Activity panel line wrapping**: Collapse newlines and tabs in tool action targets to single spaces so each agent line fits on one row
+
+## [2.16.0] - 2026-05-13
+
+### Changed
+- **Full-width activity panel**: Activity view takes the entire bottom section width instead of sharing with Blockages column
+- **Removed redundant (ended) text**: Ended agents use dim styling only — no explicit "(ended)" suffix
+
+## [2.15.0] - 2026-05-13
+
+### Added
+- **Agent Activity panel** (#6): Live cross-session agent tree in bottom-left carousel (LEFT/RIGHT arrows toggle Settings/Activity views)
+- **Agent tree display**: Root agents show `▸ workspace_name` with tool trails (`E:foo.py`, `B:pytest`), subagents show `↳ subagent_type`
+- **Tool abbreviations**: E=Edit, W=Write, R=Read, B=Bash, G=Grep, L=Glob, T=Task, F=WebFetch, S=WebSearch, N=NotebookEdit
+- **2-second cache**: `get_active_agent_tree_cached()` reads session_registry.db with WAL mode and 5s timeout
+
 ## [2.14.0] - 2026-05-13
 
 ### Added

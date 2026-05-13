@@ -86,6 +86,7 @@ def format_action(action, max_target_len=10):
     abbrev = TOOL_ABBREV.get(tool_name, tool_name[0:1].upper())
     raw_target = action.get("target")
     target = str(raw_target) if raw_target is not None else "-"
+    target = " ".join(target.split())
     if len(target) > max_target_len:
         target = target[: max_target_len - 1] + "…"
     return f"{abbrev}:{target}"

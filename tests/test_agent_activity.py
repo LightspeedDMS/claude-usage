@@ -303,6 +303,15 @@ class TestFormatAction:
 
         assert format_action({"tool_name": "Bash"}) == "B:-"
 
+    def test_newlines_in_target_collapsed_to_spaces(self):
+        from claude_usage.code_mode.display import format_action
+
+        result = format_action(
+            {"tool_name": "Bash", "target": "line1\nline2\ttab"},
+            max_target_len=20,
+        )
+        assert result == "B:line1 line2 tab"
+
 
 class TestFormatTrail:
     """format_trail joins action summaries with ' → ' separator."""
