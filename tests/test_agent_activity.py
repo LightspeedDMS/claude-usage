@@ -385,7 +385,6 @@ class TestRenderAgentLine:
         }
         result = render_agent_line(node)
         assert "[dim]" in result
-        assert "(ended)" in result
 
     def test_label_node_renders_label_text(self):
         from claude_usage.code_mode.display import render_agent_line

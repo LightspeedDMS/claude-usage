@@ -187,7 +187,7 @@ def render_agent_line(node, panel_width=AGENT_LINE_DEFAULT_PANEL_WIDTH):
     line = f"{prefix:<{ACTIVITY_PANEL_FIXED_PREFIX}}{body}"
 
     if node.get("status") == "ended_visible":
-        line = f"[dim]{line} (ended)[/dim]"
+        line = f"[dim]{line}[/dim]"
 
     return line
 
