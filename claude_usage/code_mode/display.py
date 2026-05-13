@@ -812,6 +812,30 @@ class UsageRenderer:
             )
             hook_model_escaped = hook_model.replace("[", "\\[")
             left_lines.append(f"  [bright_blue]{hook_model_escaped}[/bright_blue]")
+        elif "*" in hook_model:
+            left_lines.append(
+                self._fmt_kv(
+                    "Hook Model:",
+                    "rand",
+                    "[bright_magenta]rand[/bright_magenta]",
+                    status_col_width,
+                )
+            )
+            hook_model_escaped = hook_model.replace("[", "\\[")
+            left_lines.append(
+                f"  [bright_magenta]{hook_model_escaped}[/bright_magenta]"
+            )
+        elif "|" in hook_model:
+            left_lines.append(
+                self._fmt_kv(
+                    "Hook Model:",
+                    "fo",
+                    "[bright_yellow]fo[/bright_yellow]",
+                    status_col_width,
+                )
+            )
+            hook_model_escaped = hook_model.replace("[", "\\[")
+            left_lines.append(f"  [bright_yellow]{hook_model_escaped}[/bright_yellow]")
         elif hook_model == "auto":
             left_lines.append(
                 self._fmt_kv(
@@ -1165,8 +1189,13 @@ class UsageRenderer:
                     reviewer_markup = f" [{tag_color}]{tag_label}[/{tag_color}]"
                     strip_tag = True
                 elif "+" in reviewer_id and "->" in reviewer_id:
-                    # Competitive expression — render as [Comp] in bright_blue (visible on dark terminals)
                     reviewer_markup = " [bright_blue][Comp][/bright_blue]"
+                    strip_tag = True
+                elif "*" in reviewer_id:
+                    reviewer_markup = " [bright_magenta][Rand][/bright_magenta]"
+                    strip_tag = True
+                elif "|" in reviewer_id:
+                    reviewer_markup = " [bright_yellow][FO][/bright_yellow]"
                     strip_tag = True
                 # Strip the tag from feedback when recognized (single-model or competitive)
                 if strip_tag:

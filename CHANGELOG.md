@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.14.0] - 2026-05-13
+
+### Added
+- **Random/failover hook model display** (#67): Hook Model column shows `rand` in `bright_magenta` for random expressions (`*`), `fo` in `bright_yellow` for failover expressions (`|`), with full expression shown as subtitle. Governance feed shows `[Rand]` tag in magenta and `[FO]` tag in yellow for corresponding reviewer identifiers
+
 ## [2.11.0] - 2026-04-07
 
 ### Added
