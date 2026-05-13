@@ -30,6 +30,11 @@ DB_TIMEOUT = 5.0
 # Codex usage table singleton row id (pace-maker stores exactly one record)
 CODEX_USAGE_ROW_ID = 1
 
+# Agent activity tree constants
+AGENT_STALE_SECONDS = 1200  # 20 min — agents not seen beyond this are excluded
+AGENT_ENDED_VISIBLE_SECONDS = 60  # 60 sec — recently-ended agents remain visible
+AGENT_TREE_CACHE_TTL_SECONDS = 2  # 2 sec — TTL for get_active_agent_tree_cached
+
 
 PLUGIN_CACHE_RELATIVE = "plugins/cache/lightspeed-claude-plugins/claude-pace-maker"
 
@@ -1172,6 +1177,159 @@ class PaceMakerReader:
 
         except (sqlite3.Error, OSError):
             return []
+
+    def get_active_agent_tree(self):
+        """Read the agent activity tree from session_registry.db.
+
+        Returns list of root dicts or None if registry unavailable.
+        An empty list means no active agents.
+        None means the DB is missing or a read error occurred.
+        """
+        import time as _time
+
+        registry_path = self.pm_dir / "session_registry.db"
+        if not registry_path.exists():
+            return None
+        try:
+            conn = sqlite3.connect(str(registry_path), timeout=DB_TIMEOUT)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.row_factory = sqlite3.Row
+            try:
+                now = _time.time()
+                stale_cutoff = now - AGENT_STALE_SECONDS
+                ended_cutoff = now - AGENT_ENDED_VISIBLE_SECONDS
+
+                rows = conn.execute(
+                    "SELECT agent_id, session_id, role, subagent_type, "
+                    "workspace_root, last_seen, ended_at "
+                    "FROM agents "
+                    "WHERE (ended_at IS NULL AND last_seen >= ?) "
+                    "OR (ended_at IS NOT NULL AND ended_at >= ?) "
+                    "ORDER BY session_id, "
+                    "CASE role WHEN 'root' THEN 0 ELSE 1 END, "
+                    "last_seen DESC",
+                    (stale_cutoff, ended_cutoff),
+                ).fetchall()
+
+                return self._agent_build_tree(conn, rows, now)
+            finally:
+                conn.close()
+        except (sqlite3.Error, OSError) as exc:
+            logging.debug("get_active_agent_tree failed reading registry: %s", exc)
+            return None
+
+    def get_active_agent_tree_cached(self):
+        """Cached version of get_active_agent_tree with AGENT_TREE_CACHE_TTL_SECONDS TTL."""
+        import time as _time
+
+        now = _time.time()
+        cache = getattr(self, "_agent_tree_cache", None)
+        cache_time = getattr(self, "_agent_tree_cache_time", 0)
+        if cache is not None and (now - cache_time) < AGENT_TREE_CACHE_TTL_SECONDS:
+            return cache
+        result = self.get_active_agent_tree()
+        self._agent_tree_cache = result
+        self._agent_tree_cache_time = now
+        return result
+
+    def _agent_classify_status(self, ended_at, now: float) -> str:
+        """Classify an agent row as active, ended_visible, or purged.
+
+        Args:
+            ended_at: Unix timestamp of agent termination, or None if still running.
+            now: Current Unix timestamp for comparison.
+
+        Returns:
+            'active', 'ended_visible', or 'purged'.
+        """
+        if ended_at is None:
+            return "active"
+        if now - ended_at <= AGENT_ENDED_VISIBLE_SECONDS:
+            return "ended_visible"
+        return "purged"
+
+    def _agent_get_actions(self, conn, agent_id: str) -> list:
+        """Fetch the 3 most recent actions for an agent, oldest first.
+
+        Args:
+            conn: Open sqlite3 connection with row_factory set to sqlite3.Row.
+            agent_id: Agent identifier to query.
+
+        Returns:
+            List of dicts with keys tool_name, target, ts — oldest action first.
+        """
+        action_rows = conn.execute(
+            "SELECT tool_name, target, ts FROM agent_actions "
+            "WHERE agent_id = ? ORDER BY ts DESC, id DESC LIMIT 3",
+            (agent_id,),
+        ).fetchall()
+        return list(
+            reversed(
+                [
+                    {"tool_name": r["tool_name"], "target": r["target"], "ts": r["ts"]}
+                    for r in action_rows
+                ]
+            )
+        )
+
+    def _agent_build_tree(self, conn, rows, now: float) -> list:
+        """Assemble the agent tree from DB rows.
+
+        Groups subagents under their root sessions.  Subagents whose root
+        session is absent are collected under a synthetic '(parent ended)' group.
+
+        Args:
+            conn: Open sqlite3 connection for action queries.
+            rows: Fetched agent rows from the agents table.
+            now: Current Unix timestamp.
+
+        Returns:
+            Sorted list of root/group dicts ready for display.
+        """
+        roots_map = {}
+        subagent_rows = []
+
+        for row in rows:
+            status = self._agent_classify_status(row["ended_at"], now)
+            if row["role"] == "root":
+                roots_map[row["session_id"]] = {
+                    "agent_id": row["agent_id"],
+                    "workspace_root": row["workspace_root"],
+                    "actions": self._agent_get_actions(conn, row["agent_id"]),
+                    "status": status,
+                    "subagents": [],
+                }
+            else:
+                subagent_rows.append((row, status))
+
+        orphans = []
+        for row, status in subagent_rows:
+            sub = {
+                "agent_id": row["agent_id"],
+                "subagent_type": row["subagent_type"],
+                "actions": self._agent_get_actions(conn, row["agent_id"]),
+                "status": status,
+            }
+            parent = roots_map.get(row["session_id"])
+            if parent is not None:
+                parent["subagents"].append(sub)
+            else:
+                orphans.append(sub)
+
+        result = list(roots_map.values())
+        if orphans:
+            result.append(
+                {
+                    "label": "(parent ended)",
+                    "workspace_root": "",
+                    "status": "ended_visible",
+                    "subagents": orphans,
+                }
+            )
+        result.sort(
+            key=lambda r: (r.get("status") != "active", r.get("workspace_root", ""))
+        )
+        return result
 
     def get_recent_error_count(self, hours: int = 24) -> int:
         """Count ERROR-level log entries from the last N hours.

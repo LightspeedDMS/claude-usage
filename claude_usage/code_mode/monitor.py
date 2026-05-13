@@ -57,6 +57,9 @@ class CodeMonitor:
         self.user_scrolled = False
         self.prev_event_count = 0
 
+        # Panel carousel state (0=Settings, 1=Activity)
+        self.panel_index = 0
+
         # Load initial credentials
         self._load_credentials()
 
@@ -291,13 +294,15 @@ class CodeMonitor:
 
         # Add bottom section with blockage stats if pacemaker is available
         if pacemaker_status:
-            # CRITICAL-1d: Pass langfuse_metrics parameter to render_bottom_section
+            agent_tree = self.pacemaker_reader.get_active_agent_tree_cached()
             bottom_section = self.renderer.render_bottom_section(
                 pacemaker_status,
                 blockage_stats,
                 self.last_update,
                 langfuse_metrics=langfuse_metrics,
                 secrets_metrics=secrets_metrics,
+                panel_index=self.panel_index,
+                agent_tree=agent_tree,
             )
 
             combined_display = Group(main_display, bottom_section)
@@ -395,6 +400,10 @@ class CodeMonitor:
                                     key_queue.put("UP")
                                 elif ch3 == "B":
                                     key_queue.put("DOWN")
+                                elif ch3 == "C":
+                                    key_queue.put("RIGHT")
+                                elif ch3 == "D":
+                                    key_queue.put("LEFT")
                     except (IOError, OSError):
                         break
             finally:
@@ -432,6 +441,12 @@ class CodeMonitor:
                 if self.scroll_offset < max(0, max_events - 1):
                     self.scroll_offset += 1
                     self.user_scrolled = True
+            elif key == "LEFT":
+                if self.panel_index > 0:
+                    self.panel_index -= 1
+            elif key == "RIGHT":
+                if self.panel_index < 1:
+                    self.panel_index += 1
         return False
 
     def run(self):

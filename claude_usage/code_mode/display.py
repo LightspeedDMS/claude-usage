@@ -27,6 +27,218 @@ REVIEWER_TAGS = {
 }
 _REVIEWER_TAG_RE = re.compile(r"\[([^\]]+)\]")
 
+# Tool abbreviation map for activity panel
+TOOL_ABBREV = {
+    "Edit": "E",
+    "Write": "W",
+    "Read": "R",
+    "Bash": "B",
+    "Grep": "G",
+    "Glob": "L",
+    "Task": "T",
+    "WebFetch": "F",
+    "WebSearch": "S",
+    "NotebookEdit": "N",
+}
+
+ACTIVITY_PANEL_FIXED_PREFIX = 22  # chars reserved for agent name column
+
+# format_trail allocation constants
+TRAIL_MIN_ACTION_WIDTH = 5  # minimum chars per action slot (abbrev + colon + ≥2 target)
+TRAIL_TARGET_ABBREV_OVERHEAD = 2  # chars used by 'X:' prefix in each slot
+TRAIL_MIN_TARGET_LEN = 3  # minimum target length after overhead subtraction
+TRAIL_SEPARATOR = " → "  # separator between action summaries in a trail
+TRAIL_IDLE_TEXT = "(idle)"  # displayed when no actions are available
+
+# render_agent_line layout constants
+AGENT_LINE_DEFAULT_PANEL_WIDTH = 52  # default total width for a panel line
+AGENT_LINE_MAX_SUBAGENT_TYPE_LEN = 16  # max chars for subagent_type label
+AGENT_LINE_MAX_WORKSPACE_NAME_LEN = 18  # max chars for workspace basename
+AGENT_LINE_MAX_LABEL_LEN = 18  # max chars for synthetic group label
+
+# Activity carousel panel constants
+ACTIVITY_HEADER_RULE_WIDTH = 18  # width of the separator line under the activity header
+ACTIVITY_PANEL_MAX_ROWS = 15  # maximum agent lines shown in the activity panel
+
+
+def format_action(action, max_target_len=10):
+    """Format a single agent action as 'ABBREV:target'.
+
+    Args:
+        action: Dict with keys 'tool_name' and optionally 'target'.
+        max_target_len: Maximum characters for the target portion (must be >= 1).
+
+    Returns:
+        String in the form 'X:target', e.g. 'E:foo.py'.
+
+    Raises:
+        ValueError: If action is None/non-dict, tool_name is missing/empty,
+                    or max_target_len < 1.
+    """
+    if not action or not isinstance(action, dict):
+        raise ValueError("action must be a non-empty dict")
+    tool_name = action.get("tool_name")
+    if not tool_name:
+        raise ValueError("action must contain a non-empty 'tool_name'")
+    if not isinstance(max_target_len, int) or max_target_len < 1:
+        raise ValueError("max_target_len must be a positive integer")
+
+    abbrev = TOOL_ABBREV.get(tool_name, tool_name[0:1].upper())
+    raw_target = action.get("target")
+    target = str(raw_target) if raw_target is not None else "-"
+    if len(target) > max_target_len:
+        target = target[: max_target_len - 1] + "…"
+    return f"{abbrev}:{target}"
+
+
+def format_trail(actions, width_budget=30):
+    """Format an action list as 'X:a → Y:b → Z:c'.
+
+    Args:
+        actions: List of action dicts (may be empty).
+        width_budget: Maximum character width for the whole trail (must be a
+                      positive int; booleans are rejected).
+
+    Returns:
+        Formatted trail string, or TRAIL_IDLE_TEXT when actions is empty.
+
+    Raises:
+        ValueError: If width_budget is not a positive integer or is a boolean.
+    """
+    if type(width_budget) is not int or width_budget < 1:
+        raise ValueError("width_budget must be a positive integer (not bool)")
+    if not actions:
+        return TRAIL_IDLE_TEXT
+    sep_len = len(TRAIL_SEPARATOR)
+    sep_total = (len(actions) - 1) * sep_len
+    per_action = max(
+        (width_budget - sep_total) // len(actions),
+        TRAIL_MIN_ACTION_WIDTH,
+    )
+    target_budget = max(
+        per_action - TRAIL_TARGET_ABBREV_OVERHEAD,
+        TRAIL_MIN_TARGET_LEN,
+    )
+    parts = [format_action(a, target_budget) for a in actions]
+    trail = TRAIL_SEPARATOR.join(parts)
+    if len(trail) > width_budget:
+        trail = trail[: width_budget - 1] + "…"
+    return trail
+
+
+def _truncate(value, max_len):
+    """Coerce value to str and truncate to max_len chars with trailing ellipsis.
+
+    Args:
+        value: Any value; always coerced to str via str(value).
+        max_len: Maximum number of characters (must be >= 1).
+
+    Returns:
+        String of at most max_len characters.
+
+    Raises:
+        ValueError: If max_len < 1.
+    """
+    if max_len < 1:
+        raise ValueError("max_len must be >= 1")
+    s = str(value)
+    if len(s) > max_len:
+        s = s[: max_len - 1] + "…"
+    return s
+
+
+def render_agent_line(node, panel_width=AGENT_LINE_DEFAULT_PANEL_WIDTH):
+    """Render a single agent node line for the activity panel.
+
+    Args:
+        node: Non-None dict with 'label' (group), 'subagent_type' (subagent),
+              or 'workspace_root' (root agent).  Must have a 'status' key.
+        panel_width: Total character budget (int >= ACTIVITY_PANEL_FIXED_PREFIX).
+
+    Returns:
+        Formatted string, possibly with Rich [dim]...(ended)[/dim] markup.
+
+    Raises:
+        ValueError: If node is not a dict or panel_width is invalid.
+    """
+    import os
+
+    if not isinstance(node, dict):
+        raise ValueError("node must be a dict")
+    if type(panel_width) is not int or panel_width < ACTIVITY_PANEL_FIXED_PREFIX:
+        raise ValueError(f"panel_width must be an int >= {ACTIVITY_PANEL_FIXED_PREFIX}")
+
+    trail_budget = max(panel_width - ACTIVITY_PANEL_FIXED_PREFIX, 1)
+
+    if "label" in node:
+        label = _truncate(node["label"], AGENT_LINE_MAX_LABEL_LEN)
+        prefix = f"▸ {label}"
+        body = ""
+    elif node.get("subagent_type"):
+        st = _truncate(node["subagent_type"], AGENT_LINE_MAX_SUBAGENT_TYPE_LEN)
+        prefix = f"  ↳ {st}"
+        body = format_trail(node.get("actions", []), trail_budget)
+    else:
+        raw_ws = os.path.basename(str(node.get("workspace_root", ""))) or "unknown"
+        ws = _truncate(raw_ws, AGENT_LINE_MAX_WORKSPACE_NAME_LEN)
+        prefix = f"▸ {ws}"
+        body = format_trail(node.get("actions", []), trail_budget)
+
+    line = f"{prefix:<{ACTIVITY_PANEL_FIXED_PREFIX}}{body}"
+
+    if node.get("status") == "ended_visible":
+        line = f"[dim]{line} (ended)[/dim]"
+
+    return line
+
+
+def render_activity_panel(
+    tree, panel_width=AGENT_LINE_DEFAULT_PANEL_WIDTH, max_rows=ACTIVITY_PANEL_MAX_ROWS
+):
+    """Render the full agent activity panel as a list of strings.
+
+    Args:
+        tree: List of root node dicts from get_active_agent_tree(), or None.
+        panel_width: Character width budget per line (must be >= 1).
+        max_rows: Maximum number of lines to render, including overflow line
+                  (must be >= 1).
+
+    Returns:
+        List of strings ready for inclusion in a Rich markup panel.
+
+    Raises:
+        ValueError: If panel_width < 1 or max_rows < 1.
+    """
+    if panel_width < 1:
+        raise ValueError("panel_width must be >= 1")
+    if max_rows < 1:
+        raise ValueError("max_rows must be >= 1")
+
+    if tree is None:
+        return ["(registry unavailable)"]
+    if not tree:
+        return ["(no active agents)"]
+
+    total_agents = sum(1 + len(r.get("subagents", [])) for r in tree)
+    lines = []
+
+    for root in tree:
+        if len(lines) >= max_rows - 1:
+            break
+        lines.append(render_agent_line(root, panel_width))
+        for sub in root.get("subagents", []):
+            if len(lines) >= max_rows - 1:
+                break
+            lines.append(render_agent_line(sub, panel_width))
+
+    hidden = total_agents - len(lines)
+    if hidden > 0:
+        if len(lines) >= max_rows:
+            lines = lines[: max_rows - 1]
+        lines.append(f"▼ {hidden} more agents")
+
+    return lines
+
 
 def _md_to_rich(text):
     """Convert basic markdown formatting to Rich markup for event feed."""
@@ -628,6 +840,8 @@ class UsageRenderer:
         last_update=None,
         langfuse_metrics=None,
         secrets_metrics=None,
+        panel_index=0,
+        agent_tree=None,
     ):
         """Render two-column bottom section with status and blockage stats.
 
@@ -637,6 +851,8 @@ class UsageRenderer:
             last_update: Optional datetime of last data update
             langfuse_metrics: Optional dict with Langfuse metrics (sessions, traces, spans, total)
             secrets_metrics: Optional dict with secrets metrics (secrets_masked)
+            panel_index: 0 = Settings/Stats view (default), 1 = Activity view
+            agent_tree: Optional agent tree list from get_active_agent_tree_cached()
 
         Returns:
             Rich renderable Group with two-column layout
@@ -647,6 +863,10 @@ class UsageRenderer:
         status_separator = "-" * 18
         blockage_separator = "-" * 21  # 1 char longer than "Blockages (last hour)"
         langfuse_separator = "-" * 21  # Same width as blockage separator
+
+        # Validate panel_index before any rendering
+        if panel_index not in (0, 1):
+            raise ValueError(f"panel_index must be 0 or 1, got {panel_index!r}")
 
         # Create two-column table
         table = Table.grid(padding=(0, 2))
@@ -1044,7 +1264,24 @@ class UsageRenderer:
                 )
             )
 
-        left_content = Text.from_markup("\n".join(left_lines))
+        # Panel carousel: index 0=Settings/Stats, 1=Activity
+        # panel_index was validated above; no else needed here
+        if panel_index == 1:
+            activity_lines = [
+                "[bold]Activity ◀ 2/2 ▶[/bold]",
+                "-" * ACTIVITY_HEADER_RULE_WIDTH,
+            ]
+            activity_lines.extend(
+                render_activity_panel(
+                    agent_tree,
+                    panel_width=status_col_width,
+                    max_rows=ACTIVITY_PANEL_MAX_ROWS,
+                )
+            )
+            left_content = Text.from_markup("\n".join(activity_lines))
+        elif panel_index == 0:
+            left_lines[0] = "[bold]Settings ◀ 1/2 ▶[/bold]"
+            left_content = Text.from_markup("\n".join(left_lines))
 
         # Build right column - Blockage statistics and Langfuse metrics
         right_lines = []

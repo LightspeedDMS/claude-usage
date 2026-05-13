@@ -105,7 +105,7 @@ class TestBlockageStatsUnavailable(unittest.TestCase):
         output = self._render_to_text(result)
         self.assertIn("unavailable", output)
         # Left column should still work
-        self.assertIn("Pacing Status", output)
+        self.assertIn("Settings", output)
 
 
 class TestTerminalWidthHandling(unittest.TestCase):
@@ -129,7 +129,7 @@ class TestTerminalWidthHandling(unittest.TestCase):
         result = self.renderer.render_bottom_section(pacemaker_status, blockage_stats)
         output = self._render_to_text(result, width=80)
         # Both columns should be visible in wide terminal
-        self.assertIn("Pacing Status", output)
+        self.assertIn("Settings", output)
         self.assertIn("Blockages", output)
 
     def test_narrow_terminal_renders_without_error(self):
@@ -198,6 +198,9 @@ class TestMonitorIntegration(unittest.TestCase):
                 "spans": 100,
                 "total": 135,
             }
+            mock_pacemaker.get_active_agent_tree_cached.return_value = None
+            mock_pacemaker.get_recent_error_count.return_value = 0
+            mock_pacemaker.get_secrets_metrics.return_value = None
 
             monitor = CodeMonitor()
 
@@ -259,6 +262,9 @@ class TestMonitorIntegration(unittest.TestCase):
             mock_pacemaker.get_blockage_stats_with_labels.return_value = None
             mock_pacemaker.get_langfuse_status.return_value = False
             mock_pacemaker.get_langfuse_metrics.return_value = None
+            mock_pacemaker.get_active_agent_tree_cached.return_value = None
+            mock_pacemaker.get_recent_error_count.return_value = 0
+            mock_pacemaker.get_secrets_metrics.return_value = None
 
             monitor = CodeMonitor()
             monitor.last_usage = {

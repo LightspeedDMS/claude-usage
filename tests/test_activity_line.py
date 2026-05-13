@@ -441,6 +441,7 @@ class TestMonitorActivityLineIntegration:
 
         monitor.pacemaker_reader = mock_reader
         monitor.renderer = UsageRenderer()
+        monitor.panel_index = 0
 
         # Should not raise and should include activity line
         display = monitor.get_display()

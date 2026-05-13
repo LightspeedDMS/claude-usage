@@ -55,7 +55,7 @@ class TestRenderBottomSectionLeftColumn:
     # ---- Header ----
 
     def test_pacing_status_header_present(self):
-        assert "Pacing Status" in self._render(_make_pacemaker_status())
+        assert "Settings" in self._render(_make_pacemaker_status())
 
     # ---- Tempo ----
 
@@ -101,14 +101,14 @@ class TestRenderBottomSectionLeftColumn:
         rendered = self._render(
             _make_pacemaker_status(langfuse_enabled=True, langfuse_connected=True)
         )
-        assert "Connected" in rendered
+        assert "✓" in rendered
 
     def test_langfuse_disconnected_custom_message(self):
         pm = dict(
             _make_pacemaker_status(langfuse_enabled=True, langfuse_connected=False)
         )
         pm["langfuse_connection"] = {"connected": False, "message": "Unreachable"}
-        assert "Unreachable" in self._render(pm)
+        assert "✗" in self._render(pm)
 
     # ---- TDD ----
 

@@ -105,6 +105,23 @@ Reviewer tag extraction uses the `_REVIEWER_TAG_RE` regex pattern in `display.py
 
 ---
 
+## Agent Activity Panel
+
+The bottom-left panel has a 2-view carousel toggled with LEFT/RIGHT arrow keys:
+
+- **Settings (1/2)**: Pacing status indicators (default view)
+- **Activity (2/2)**: Live cross-session agent tree
+
+The Activity view reads `~/.claude-pace-maker/session_registry.db` (read-only WAL, 5s timeout) via `PaceMakerReader.get_active_agent_tree_cached()` (2s TTL). Returns `None` when DB is missing (displays "(registry unavailable)") or `[]` when no active agents.
+
+Tree structure: root agents show `▸ workspace_name` with tool trails (`E:foo.py → B:pytest`), subagents show `↳ subagent_type`. Ended agents are dimmed with `(ended)` suffix. Orphan subagents (root already purged) group under `(parent ended)`.
+
+Tool abbreviations: E=Edit, W=Write, R=Read, B=Bash, G=Grep, L=Glob, T=Task, F=WebFetch, S=WebSearch, N=NotebookEdit.
+
+Key functions: `format_action()`, `format_trail()`, `render_agent_line()`, `render_activity_panel()` in `display.py`. Panel state: `CodeMonitor.panel_index` (0 or 1).
+
+---
+
 ## Technologies
 
 - **Rich**: Terminal UI with progress bars and live updates
