@@ -1267,21 +1267,34 @@ class UsageRenderer:
         # Panel carousel: index 0=Settings/Stats, 1=Activity
         # panel_index was validated above; no else needed here
         if panel_index == 1:
+            # Full-width single-column layout — Activity takes the whole bottom section
+            full_width = status_col_width + 4 + blockage_col_width  # 22 + 4 + 21 = 47
             activity_lines = [
                 "[bold]Activity ◀ 2/2 ▶[/bold]",
-                "-" * ACTIVITY_HEADER_RULE_WIDTH,
+                "-" * full_width,
             ]
             activity_lines.extend(
                 render_activity_panel(
                     agent_tree,
-                    panel_width=status_col_width,
+                    panel_width=full_width,
                     max_rows=ACTIVITY_PANEL_MAX_ROWS,
                 )
             )
-            left_content = Text.from_markup("\n".join(activity_lines))
-        elif panel_index == 0:
-            left_lines[0] = "[bold]Settings ◀ 1/2 ▶[/bold]"
-            left_content = Text.from_markup("\n".join(left_lines))
+            activity_content = Text.from_markup("\n".join(activity_lines))
+
+            single_table = Table.grid(padding=(0, 0))
+            single_table.add_column("activity", ratio=1)
+            single_table.add_row(activity_content)
+
+            ctrl_text = "Press Ctrl+C to stop"
+            pad_left = (full_width - len(ctrl_text)) // 2
+            centered_instruction = Text(" " * pad_left + ctrl_text, style="dim")
+
+            return Group(single_table, centered_instruction)
+
+        # panel_index == 0: two-column layout (Settings + Blockages/Langfuse/Secrets)
+        left_lines[0] = "[bold]Settings ◀ 1/2 ▶[/bold]"
+        left_content = Text.from_markup("\n".join(left_lines))
 
         # Build right column - Blockage statistics and Langfuse metrics
         right_lines = []
