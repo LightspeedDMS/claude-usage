@@ -33,6 +33,9 @@ CODEX_USAGE_ROW_ID = 1
 # Agent activity tree constants
 AGENT_STALE_SECONDS = 1200  # 20 min — agents not seen beyond this are excluded
 AGENT_ENDED_VISIBLE_SECONDS = 60  # 60 sec — recently-ended agents remain visible
+AGENT_STALE_VISUAL_SECONDS = (
+    180  # 3 min — active agents not seen beyond this are dimmed
+)
 AGENT_TREE_CACHE_TTL_SECONDS = 2  # 2 sec — TTL for get_active_agent_tree_cached
 
 
@@ -1292,6 +1295,11 @@ class PaceMakerReader:
         for row in rows:
             status = self._agent_classify_status(row["ended_at"], now)
             if row["role"] == "root":
+                if (
+                    status == "active"
+                    and (now - row["last_seen"]) > AGENT_STALE_VISUAL_SECONDS
+                ):
+                    status = "ended_visible"
                 roots_map[row["session_id"]] = {
                     "agent_id": row["agent_id"],
                     "workspace_root": row["workspace_root"],

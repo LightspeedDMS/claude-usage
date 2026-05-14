@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.18.0] - 2026-05-13
+
+### Fixed
+- **Stale session cleanup**: Dead sessions no longer linger in the activity panel for 20 minutes when the pace-maker stop hook fails to call `mark_agent_ended()`. Root agents with no heartbeat for 3 minutes (`AGENT_STALE_VISUAL_SECONDS`) are dimmed as `ended_visible` and removed after 60s
+
 ## [2.17.0] - 2026-05-13
 
 ### Fixed
