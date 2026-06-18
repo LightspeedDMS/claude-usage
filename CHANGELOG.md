@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.19.0] - 2026-06-18
+
+### Added
+- **Antigravity CLI (agy) governance feed tag.** All 11 agy model aliases (`agy`, `agy-flash`, `agy-flash-low`, `agy-flash-medium`, `agy-flash-high`, `agy-pro`, `agy-pro-low`, `agy-pro-high`, `agy-gpt-oss`, `agy-sonnet`, `agy-opus`) map to `[Agy]` tag rendered in `bright_green` in the governance event feed. Hook Model column shows `bright_green` for any agy model. (`claude_usage/code_mode/display.py`)
+
 ## [2.18.0] - 2026-05-13
 
 ### Fixed

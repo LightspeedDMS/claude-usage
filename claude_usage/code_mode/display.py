@@ -24,6 +24,18 @@ REVIEWER_TAGS = {
     "sdk-fallback": ("[SDK]", "green"),
     "gem-flash": ("[Gem]", "cyan"),
     "gem-pro": ("[Gem]", "cyan"),
+    # Antigravity CLI (agy) reviewer tags — Story #72
+    "agy": ("[Agy]", "bright_green"),
+    "agy-flash": ("[Agy]", "bright_green"),
+    "agy-flash-low": ("[Agy]", "bright_green"),
+    "agy-flash-medium": ("[Agy]", "bright_green"),
+    "agy-flash-high": ("[Agy]", "bright_green"),
+    "agy-pro": ("[Agy]", "bright_green"),
+    "agy-pro-low": ("[Agy]", "bright_green"),
+    "agy-pro-high": ("[Agy]", "bright_green"),
+    "agy-gpt-oss": ("[Agy]", "bright_green"),
+    "agy-sonnet": ("[Agy]", "bright_green"),
+    "agy-opus": ("[Agy]", "bright_green"),
 }
 _REVIEWER_TAG_RE = re.compile(r"\[([^\]]+)\]")
 
@@ -1084,6 +1096,8 @@ class UsageRenderer:
                             color = "yellow"
             elif "gemini" in hook_model.lower():
                 color = "cyan"
+            elif "agy" in hook_model.lower():
+                color = "bright_green"
             left_lines.append(
                 self._fmt_kv(
                     "Hook Model:",
