@@ -111,6 +111,53 @@ class TestAgyTagRegexMatching:
         assert "agy-pro-high" in REVIEWER_TAGS
 
 
+class TestAgyTagRichRendering:
+    """Reviewer tag labels must appear literally in event feed output.
+
+    Bug: tag_label values like '[Agy]', '[Codex]', '[SDK]' are passed to
+    Text.from_markup() without escaping. Rich interprets '[Agy]' as a style
+    tag, silently swallows it (not a known Rich style), and the label never
+    appears in plain text output.
+
+    Fix: escape '[' to '\\[' in tag_label before building reviewer_markup.
+    """
+
+    def _make_event(self, feedback_text, event_type="IV"):
+        return {
+            "event_type": event_type,
+            "timestamp": 1700000000,
+            "project_name": "test-project",
+            "feedback_text": feedback_text,
+        }
+
+    def test_agy_tag_label_appears_literally_in_event_feed_output(self):
+        """'[Agy]' must appear in plain text after render_event_feed with agy reviewer."""
+        renderer = UsageRenderer()
+        events = [self._make_event("[agy-gpt-oss] APPROVED - intent matches diff")]
+        result = renderer.render_event_feed(events, available_width=80)
+        assert "[Agy]" in result.plain, (
+            f"Expected '[Agy]' to appear literally in plain output, got: {result.plain!r}"
+        )
+
+    def test_codex_tag_label_appears_literally_in_event_feed_output(self):
+        """'[Codex]' must appear in plain text after render_event_feed with codex reviewer."""
+        renderer = UsageRenderer()
+        events = [self._make_event("[codex-gpt5] APPROVED - looks good")]
+        result = renderer.render_event_feed(events, available_width=80)
+        assert "[Codex]" in result.plain, (
+            f"Expected '[Codex]' to appear literally in plain output, got: {result.plain!r}"
+        )
+
+    def test_sdk_tag_label_appears_literally_in_event_feed_output(self):
+        """'[SDK]' must appear in plain text after render_event_feed with sdk reviewer."""
+        renderer = UsageRenderer()
+        events = [self._make_event("[anthropic-sdk] APPROVED - safe operation")]
+        result = renderer.render_event_feed(events, available_width=80)
+        assert "[SDK]" in result.plain, (
+            f"Expected '[SDK]' to appear literally in plain output, got: {result.plain!r}"
+        )
+
+
 class TestAgyHookModelColor:
     """Hook Model column in render_bottom_section must use bright_green for agy models."""
 
