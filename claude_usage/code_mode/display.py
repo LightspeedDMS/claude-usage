@@ -39,6 +39,25 @@ REVIEWER_TAGS = {
 }
 _REVIEWER_TAG_RE = re.compile(r"\[([^\]]+)\]")
 
+# Codex profile prefix — Story #75: codex-<profile> labels not in REVIEWER_TAGS use this.
+_CODEX_PROFILE_TAG = ("[Codex]", "yellow")
+
+
+def get_reviewer_tag_info(reviewer_id: str):
+    """Return (tag_label, tag_color) for reviewer_id, or None if unrecognised.
+
+    Lookup order (important for collision avoidance):
+    1. Exact REVIEWER_TAGS dict lookup — preserves codex-gpt5 and all static entries.
+    2. codex-<profile> prefix rule — covers dynamic named-profile tokens (Story #75).
+    """
+    tag_info = REVIEWER_TAGS.get(reviewer_id)
+    if tag_info is not None:
+        return tag_info
+    if reviewer_id.startswith("codex-") and len(reviewer_id) > len("codex-"):
+        return _CODEX_PROFILE_TAG
+    return None
+
+
 # Tool abbreviation map for activity panel
 TOOL_ABBREV = {
     "Edit": "E",
@@ -1045,30 +1064,6 @@ class UsageRenderer:
             )
             hook_model_escaped = hook_model.replace("[", "\\[")
             left_lines.append(f"  [bright_blue]{hook_model_escaped}[/bright_blue]")
-        elif "*" in hook_model:
-            left_lines.append(
-                self._fmt_kv(
-                    "Hook Model:",
-                    "rand",
-                    "[bright_magenta]rand[/bright_magenta]",
-                    status_col_width,
-                )
-            )
-            hook_model_escaped = hook_model.replace("[", "\\[")
-            left_lines.append(
-                f"  [bright_magenta]{hook_model_escaped}[/bright_magenta]"
-            )
-        elif "|" in hook_model:
-            left_lines.append(
-                self._fmt_kv(
-                    "Hook Model:",
-                    "fo",
-                    "[bright_yellow]fo[/bright_yellow]",
-                    status_col_width,
-                )
-            )
-            hook_model_escaped = hook_model.replace("[", "\\[")
-            left_lines.append(f"  [bright_yellow]{hook_model_escaped}[/bright_yellow]")
         elif hook_model == "auto":
             left_lines.append(
                 self._fmt_kv(
@@ -1448,19 +1443,13 @@ class UsageRenderer:
             if match:
                 reviewer_id = match.group(1)
                 strip_tag = False
-                tag_info = REVIEWER_TAGS.get(reviewer_id)
+                tag_info = get_reviewer_tag_info(reviewer_id)
                 if tag_info:
                     tag_label, tag_color = tag_info
                     reviewer_markup = f" [{tag_color}]{tag_label}[/{tag_color}]"
                     strip_tag = True
                 elif "+" in reviewer_id and "->" in reviewer_id:
                     reviewer_markup = " [bright_blue][Comp][/bright_blue]"
-                    strip_tag = True
-                elif "*" in reviewer_id:
-                    reviewer_markup = " [bright_magenta][Rand][/bright_magenta]"
-                    strip_tag = True
-                elif "|" in reviewer_id:
-                    reviewer_markup = " [bright_yellow][FO][/bright_yellow]"
                     strip_tag = True
                 # Strip the tag from feedback when recognized (single-model or competitive)
                 if strip_tag:
