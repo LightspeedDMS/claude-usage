@@ -197,7 +197,22 @@ class TestPacemakerReaderConcurrency:
         return pm_dir
 
     def test_get_latest_usage_uses_timeout(self, mock_pm_dir, monkeypatch):
-        """Test that _get_latest_usage() uses timeout parameter"""
+        """Test that _get_latest_usage() uses timeout parameter
+
+        NOTE: _get_latest_usage() no longer owns a single sqlite3.connect()
+        call directly — it delegates to the real, dynamically-imported
+        pacemaker.usage_model.UsageModel.get_current_usage(), which performs
+        several short-lived connections internally (schema check, fallback
+        state, api_cache read — see claude-pace-maker's documented
+        multi-connection read pattern). The mocked sqlite3.connect (patched
+        at the shared sqlite3 module) therefore observes multiple calls, not
+        exactly one. The concurrency-safety property this test actually
+        cares about — every connection is bounded by a positive timeout, so
+        lock contention can't hang the reader — holds regardless of how many
+        internal connections pace-maker's UsageModel makes, so we assert
+        that property across ALL observed calls instead of hardcoding a
+        call count that belongs to pace-maker's implementation.
+        """
         # Mock Path.home() to return our test directory
         monkeypatch.setattr(Path, "home", lambda: mock_pm_dir.parent)
 
@@ -214,16 +229,15 @@ class TestPacemakerReaderConcurrency:
 
             reader._get_latest_usage()
 
-            # Verify connect was called with timeout
-            mock_connect.assert_called_once()
-            call_args = mock_connect.call_args
-
-            # Check timeout parameter
-            assert "timeout" in call_args.kwargs or len(call_args.args) >= 2
-            if "timeout" in call_args.kwargs:
-                assert call_args.kwargs["timeout"] > 0
-            else:
-                assert call_args.args[1] > 0
+            # Verify connect was called at least once, and EVERY call used a
+            # positive timeout (bounded, non-hanging DB access).
+            assert mock_connect.call_count >= 1
+            for call_args in mock_connect.call_args_list:
+                assert "timeout" in call_args.kwargs or len(call_args.args) >= 2
+                if "timeout" in call_args.kwargs:
+                    assert call_args.kwargs["timeout"] > 0
+                else:
+                    assert call_args.args[1] > 0
 
     def test_get_latest_usage_enables_wal(self, mock_pm_dir, monkeypatch):
         """Test that _get_latest_usage() enables WAL mode"""

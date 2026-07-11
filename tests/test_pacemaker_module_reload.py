@@ -27,6 +27,37 @@ from claude_usage.code_mode.pacemaker_integration import (
     PaceMakerReader,
 )
 
+_MISSING = object()
+
+
+def _snapshot_and_schedule_restore(testcase, module_names):
+    """Snapshot sys.modules[name] for each name (present or absent) and
+    register a self.addCleanup that restores EXACTLY that original state.
+
+    Several tests below intentionally pop/replace sys.modules entries for
+    "pacemaker" and "pacemaker.clean_code_rules" to simulate reinstall/
+    uninstall scenarios. Without restoring the ORIGINAL entry afterward
+    (real module or absent), a real "pacemaker" package cached by an
+    earlier test in the same full-suite pytest process gets evicted and
+    never comes back — later tests that do a real
+    `from pacemaker.usage_model import UsageModel` then get a freshly
+    re-imported "pacemaker" parent module missing the "usage_model"
+    attribute (because "pacemaker.usage_model" is still cache-hit in
+    sys.modules from the earlier, now-orphaned parent), causing
+    AttributeError: module 'pacemaker' has no attribute 'usage_model'
+    in unrelated test files (e.g. test_refresh_from_model_per_model_data.py).
+    """
+    saved = {name: sys.modules.get(name, _MISSING) for name in module_names}
+
+    def _restore():
+        for name, value in saved.items():
+            if value is _MISSING:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = value
+
+    testcase.addCleanup(_restore)
+
 
 class TestDefaultCleanCodeRulesCount(unittest.TestCase):
     """DEFAULT_CLEAN_CODE_RULES_COUNT constant must reflect current rule count."""
@@ -53,6 +84,12 @@ class TestGetCleanCodeRulesCountReload(unittest.TestCase):
         self.reader = PaceMakerReader()
         # Point pm_src to a dummy path that "exists" (we'll mock the path check)
         self._fake_src = Path("/fake/pacemaker/src")
+        # Tests in this class replace/evict sys.modules["pacemaker"] and
+        # sys.modules["pacemaker.clean_code_rules"] to simulate reinstall/
+        # uninstall — always restore whatever was really there afterward.
+        _snapshot_and_schedule_restore(
+            self, ["pacemaker", "pacemaker.clean_code_rules"]
+        )
 
     def _make_rules_module(self, rule_count: int) -> types.ModuleType:
         """Create a fake pacemaker.clean_code_rules module with N rules."""
@@ -106,7 +143,7 @@ class TestGetCleanCodeRulesCountReload(unittest.TestCase):
 
     def test_get_clean_code_rules_count_returns_default_when_import_fails(self):
         """When pacemaker.clean_code_rules cannot be imported, return DEFAULT_CLEAN_CODE_RULES_COUNT."""
-        # Remove any cached pacemaker modules
+        # Remove any cached pacemaker modules (restored by setUp's addCleanup)
         sys.modules.pop("pacemaker.clean_code_rules", None)
         sys.modules.pop("pacemaker", None)
 
@@ -120,15 +157,6 @@ class TestGetCleanCodeRulesCountReload(unittest.TestCase):
             "Should return DEFAULT_CLEAN_CODE_RULES_COUNT when import fails",
         )
 
-    def tearDown(self):
-        """Clean up any fake modules we installed in sys.modules."""
-        sys.modules.pop("pacemaker.clean_code_rules", None)
-        # Only remove pacemaker parent if we installed a fake one
-        pm = sys.modules.get("pacemaker")
-        if pm is not None and not hasattr(pm, "__file__"):
-            # It's a dummy module (no file), safe to remove
-            sys.modules.pop("pacemaker", None)
-
 
 class TestGetPacemakerVersionReload(unittest.TestCase):
     """get_pacemaker_version() must reload the pacemaker package on each call.
@@ -140,6 +168,10 @@ class TestGetPacemakerVersionReload(unittest.TestCase):
 
     def setUp(self):
         self.reader = PaceMakerReader()
+        # Tests in this class replace/evict sys.modules["pacemaker"] to
+        # simulate reinstall/uninstall — always restore whatever was really
+        # there afterward (see _snapshot_and_schedule_restore docstring).
+        _snapshot_and_schedule_restore(self, ["pacemaker"])
 
     def _make_pacemaker_package(self, version: str) -> types.ModuleType:
         """Create a fake pacemaker package module with the given __version__."""
@@ -182,7 +214,7 @@ class TestGetPacemakerVersionReload(unittest.TestCase):
         """When no pace-maker source directory is locatable, fall back to importlib.metadata."""
         import tempfile
 
-        sys.modules.pop("pacemaker", None)
+        sys.modules.pop("pacemaker", None)  # restored by setUp's addCleanup
 
         with tempfile.TemporaryDirectory() as tmpdir:
             self.reader.pm_dir = Path(tmpdir)
@@ -203,7 +235,7 @@ class TestGetPacemakerVersionReload(unittest.TestCase):
         import tempfile
         from importlib.metadata import PackageNotFoundError
 
-        sys.modules.pop("pacemaker", None)
+        sys.modules.pop("pacemaker", None)  # restored by setUp's addCleanup
 
         with tempfile.TemporaryDirectory() as tmpdir:
             self.reader.pm_dir = Path(tmpdir)
@@ -222,12 +254,6 @@ class TestGetPacemakerVersionReload(unittest.TestCase):
             "unknown",
             "Should return 'unknown' when pacemaker is not installed and metadata unavailable",
         )
-
-    def tearDown(self):
-        """Clean up fake pacemaker modules."""
-        pm = sys.modules.get("pacemaker")
-        if pm is not None and not hasattr(pm, "__file__"):
-            sys.modules.pop("pacemaker", None)
 
 
 if __name__ == "__main__":

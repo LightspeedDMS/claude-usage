@@ -311,7 +311,28 @@ class TestPaceMakerPipxImport(unittest.TestCase):
         with open(install_source_file, "w") as f:
             f.write(pipx_path)
 
-        # Remove any existing pacemaker modules from sys.modules
+        # Remove any existing pacemaker modules from sys.modules, restoring
+        # them afterward. Without restoration this leaks into every test
+        # that runs later in the same pytest process (the full-suite run
+        # is a single process — see tests/test_refresh_from_model_per_model_data.py,
+        # which patches pacemaker.usage_model.UsageModel and fails with
+        # "module 'pacemaker' has no attribute 'usage_model'" if this
+        # deletion isn't undone).
+        _MISSING = object()
+        saved_modules = {
+            name: sys.modules.get(name, _MISSING)
+            for name in ("pacemaker", "pacemaker.pacing_engine")
+        }
+
+        def _restore_modules():
+            for name, value in saved_modules.items():
+                if value is _MISSING:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = value
+
+        self.addCleanup(_restore_modules)
+
         sys.modules.pop("pacemaker", None)
         sys.modules.pop("pacemaker.pacing_engine", None)
 

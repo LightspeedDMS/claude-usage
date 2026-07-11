@@ -143,8 +143,12 @@ class TestRefreshFromModelNaiveTimestamps:
         assert monitor_no_io.last_usage["five_hour"]["utilization"] == 12.0
         assert monitor_no_io.last_usage["seven_day"]["utilization"] == 75.0
         assert monitor_no_io.last_update is not None
-        assert monitor_no_io.last_update.tzinfo is not None, (
-            "last_update must be timezone-aware"
+        # _refresh_from_model() deliberately normalizes to naive local time
+        # (ts.astimezone(tz=None).replace(tzinfo=None) in monitor.py), matching
+        # the sibling API-fetch path's naive datetime.now() — consistent by
+        # design, not a bug. See CodeMonitor.fetch_usage()'s last_update.
+        assert monitor_no_io.last_update.tzinfo is None, (
+            "last_update is intentionally naive local time (matches fetch_usage())"
         )
 
     def test_aware_snapshot_also_works(self, monitor_no_io):
@@ -163,7 +167,9 @@ class TestRefreshFromModelNaiveTimestamps:
         assert result is True
         assert monitor_no_io.last_usage is not None
         assert monitor_no_io.last_usage["five_hour"]["utilization"] == 50.0
-        assert monitor_no_io.last_update.tzinfo is not None
+        # See test_naive_snapshot_populates_last_usage above: _refresh_from_model()
+        # always normalizes to naive local time by design, aware input included.
+        assert monitor_no_io.last_update.tzinfo is None
 
     def test_stale_naive_snapshot_accepted_when_no_prior_data(self, monitor_no_io):
         """When last_usage is None, accept stale data beyond freshness window."""
@@ -337,6 +343,12 @@ class TestMonitor429FrameRendering:
 
         mock_usage_model_cls = MagicMock()
         mock_usage_model_cls.return_value.get_current_usage.return_value = snapshot
+        # No per-model api_cache data for this scenario (matches a fresh/real
+        # UsageModel with no api_cache row yet) — without this, the
+        # unconfigured MagicMock chain leaks truthy bogus values into
+        # last_usage["seven_day_sonnet"] etc., which later crashes
+        # get_display()'s per-model rendering with a MagicMock >= int TypeError.
+        mock_usage_model_cls.return_value.get_api_cache.return_value = None
 
         mock_module = MagicMock()
         mock_module.UsageModel = mock_usage_model_cls

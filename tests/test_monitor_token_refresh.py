@@ -23,6 +23,20 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.credentials_path = Path(self.temp_dir) / ".credentials.json"
         self.db_path = Path(self.temp_dir) / "usage_history.db"
 
+        # Force the pace-maker UsageModel fast-path off so these tests
+        # deterministically exercise the OAuth token-reload logic under
+        # test, regardless of whether pace-maker happens to be installed
+        # (with real, fresh usage data) on the machine running the suite.
+        # Without this, CodeMonitor.fetch_usage() short-circuits via
+        # _refresh_from_model() before ever reaching the credential-expiry
+        # checks this test class exists to verify.
+        refresh_from_model_patcher = patch(
+            "claude_usage.code_mode.monitor.CodeMonitor._refresh_from_model",
+            return_value=False,
+        )
+        refresh_from_model_patcher.start()
+        self.addCleanup(refresh_from_model_patcher.stop)
+
         # Current time in milliseconds
         current_time = datetime.now().timestamp() * 1000
 
