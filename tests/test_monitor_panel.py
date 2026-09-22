@@ -62,6 +62,6 @@ class TestDrainKeyQueuePanel:
 
 
 class TestVersionBump:
-    def test_version_is_2_19_3(self):
+    def test_version_is_2_19_4(self):
         from claude_usage import __version__
-        assert __version__ == "2.19.3"
+        assert __version__ == "2.19.4"
