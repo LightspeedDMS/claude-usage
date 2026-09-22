@@ -13,6 +13,7 @@ from datetime import datetime
 
 # Constants for time calculations
 SECONDS_IN_24_HOURS = 86400
+BLOCKAGE_LOOKBACK_SECONDS = 3600  # 60 min — window for get_blockage_stats()
 
 # Default clean code rules count from pace-maker
 DEFAULT_CLEAN_CODE_RULES_COUNT = 20
@@ -40,6 +41,41 @@ AGENT_TREE_CACHE_TTL_SECONDS = 2  # 2 sec — TTL for get_active_agent_tree_cach
 
 
 PLUGIN_CACHE_RELATIVE = "plugins/cache/lightspeed-claude-plugins/claude-pace-maker"
+
+# Blockage categories pace-maker may write to blockage_events.category, in
+# display order, with their human-readable panel labels. Kept in sync with
+# claude-pace-maker's src/pacemaker/constants.py BLOCKAGE_CATEGORIES.
+# A category written by pace-maker but not listed here is NOT dropped: per
+# claude-pace-maker CLAUDE.md's "Cross-Process Data Access Pattern" ("tolerate
+# additive producer changes"), get_blockage_stats() appends it after this
+# known list instead, and get_blockage_stats_with_labels() falls back to
+# _humanize_blockage_category() for its label. See issue #7.
+KNOWN_BLOCKAGE_CATEGORIES = [
+    ("intent_validation", "Intent Val."),
+    ("intent_validation_tdd", "Intent TDD"),
+    ("intent_validation_cleancode", "Clean Code"),
+    ("intent_validation_dangerbash", "Danger Bash"),
+    ("intent_validation_bug", "Bug Detected"),
+    ("intent_validation_deferred", "IV Deferred"),
+    ("intent_validation_reviewer_unavailable", "Reviewer Unavailable"),
+    ("pacing_tempo", "Pacing Tempo"),
+    ("pacing_quota", "Pacing Quota"),
+    ("other", "Other"),
+]
+
+_KNOWN_BLOCKAGE_LABELS = dict(KNOWN_BLOCKAGE_CATEGORIES)
+
+
+def _humanize_blockage_category(category: str) -> str:
+    """Fallback label for a blockage category not in _KNOWN_BLOCKAGE_LABELS.
+
+    Renders a snake_case category as Title Case words, e.g.
+    "some_new_category" -> "Some New Category", so a category pace-maker
+    adds in the future is still legible without a code change here.
+    """
+    if not category:
+        return category
+    return " ".join(word.capitalize() for word in category.split("_"))
 
 
 def _parse_version_tuple(version_str: str) -> tuple:
@@ -564,25 +600,49 @@ class PaceMakerReader:
             )
             return None
 
+    def _fetch_blockage_rows(self, cutoff_timestamp: int):
+        """Run the grouped blockage_events query for get_blockage_stats().
+
+        Connection is always closed, including when the query raises.
+
+        Returns:
+            List of (category, count) tuples, ordered by category.
+        """
+        conn = None
+        try:
+            conn = sqlite3.connect(str(self.db_path), timeout=DB_TIMEOUT)
+            conn.execute("PRAGMA journal_mode=WAL")
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT category, COUNT(*) as count
+                FROM blockage_events
+                WHERE timestamp >= ?
+                GROUP BY category
+                ORDER BY category
+                """,
+                (cutoff_timestamp,),
+            )
+            return cursor.fetchall()
+        finally:
+            if conn is not None:
+                conn.close()
+
     def get_blockage_stats(self) -> Optional[Dict[str, int]]:
         """Get blockage counts per category for the last 60 minutes.
 
+        Every category the DB returns is included, not just the ones known
+        when this reader was written: known categories
+        (KNOWN_BLOCKAGE_CATEGORIES) are zero-filled and listed first, in
+        order; any other category is appended afterward (alphabetically) so
+        an unrecognized/future category is never silently dropped (issue #7).
+
         Returns:
-            Dict mapping each category to its count (zero-filled for missing categories),
-            plus a 'total' key with sum of all counts.
+            Dict mapping each category to its count (known categories
+            zero-filled when absent), plus a 'total' key summing every row
+            the DB returned (known and unknown categories alike).
             Returns None if database is unavailable.
         """
-        # Define all expected categories (matching pace-maker constants)
-        categories = [
-            "intent_validation",
-            "intent_validation_tdd",
-            "intent_validation_cleancode",
-            "intent_validation_dangerbash",
-            "pacing_tempo",
-            "pacing_quota",
-            "other",
-        ]
-
         if not self.is_installed():
             return None
 
@@ -592,37 +652,15 @@ class PaceMakerReader:
         try:
             import time
 
-            # Calculate cutoff timestamp (60 minutes ago)
-            cutoff_timestamp = int(time.time()) - 3600
+            cutoff_timestamp = int(time.time()) - BLOCKAGE_LOOKBACK_SECONDS
+            rows = self._fetch_blockage_rows(cutoff_timestamp)
 
-            conn = sqlite3.connect(str(self.db_path), timeout=5.0)
-            conn.execute("PRAGMA journal_mode=WAL")
-            cursor = conn.cursor()
-
-            # Query counts grouped by category
-            cursor.execute(
-                """
-                SELECT category, COUNT(*) as count
-                FROM blockage_events
-                WHERE timestamp >= ?
-                GROUP BY category
-                """,
-                (cutoff_timestamp,),
-            )
-
-            # Initialize result with all categories set to 0
-            result = {category: 0 for category in categories}
-
-            # Update result with actual counts
-            for row in cursor.fetchall():
-                category, count = row
-                if category in result:
-                    result[category] = count
-
-            conn.close()
-
-            # Add total
-            result["total"] = sum(result[cat] for cat in categories)
+            result = {category: 0 for category, _ in KNOWN_BLOCKAGE_CATEGORIES}
+            total = 0
+            for category, count in rows:
+                total += count
+                result[category] = count
+            result["total"] = total
 
             return result
 
@@ -632,28 +670,26 @@ class PaceMakerReader:
     def get_blockage_stats_with_labels(self) -> Optional[Dict[str, int]]:
         """Get blockage stats with human-readable category labels.
 
+        Labels come from _KNOWN_BLOCKAGE_LABELS; any category get_blockage_stats()
+        returned that isn't in that map (a category this reader doesn't know
+        about yet) still gets a row, via _humanize_blockage_category() (issue #7).
+
         Returns:
             Dict mapping human-readable labels to counts, plus 'Total'.
             Returns None if database is unavailable.
         """
-        # Human-readable labels for categories (excluding 'other' - catch-all that's rarely used)
-        category_labels = {
-            "intent_validation": "Intent Val.",
-            "intent_validation_tdd": "Intent TDD",
-            "intent_validation_cleancode": "Clean Code",
-            "intent_validation_dangerbash": "Danger Bash",
-            "pacing_tempo": "Pacing Tempo",
-            "pacing_quota": "Pacing Quota",
-        }
-
         stats = self.get_blockage_stats()
         if stats is None:
             return None
 
-        # Convert to human-readable labels
         result = {}
-        for category, label in category_labels.items():
-            result[label] = stats.get(category, 0)
+        for category, count in stats.items():
+            if category == "total":
+                continue
+            label = _KNOWN_BLOCKAGE_LABELS.get(category) or _humanize_blockage_category(
+                category
+            )
+            result[label] = count
 
         result["Total"] = stats.get("total", 0)
         return result
