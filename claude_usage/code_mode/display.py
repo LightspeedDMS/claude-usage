@@ -865,6 +865,36 @@ class UsageRenderer:
             padding = 1
         return f"{label}{' ' * padding}{markup_value}"
 
+    def _truncate_blockage_label(self, label, value_str, width):
+        """Return "label:", truncated with an ellipsis if it's long enough
+        that "label:" + " " + value_str would overflow `width`.
+
+        Without this, a category label at or beyond the column width (e.g.
+        "Reviewer Unavailable:" is exactly 21 chars, the design width of
+        the blockage column) makes _fmt_kv's padding collapse to a bare
+        1-space fallback, misaligning the value column; an unbounded
+        humanized label for an unrecognized category (see
+        _humanize_blockage_category in pacemaker_integration.py) can wrap
+        the row entirely. See issue #7 code review, commit 53fb2c2.
+
+        Precondition: `value_str` fits comfortably within `width` (true
+        for every real caller — blockage counts, width=21). If `value_str`
+        alone is long enough to leave no room for even a 1-char label plus
+        its separating space, the label degrades to "" rather than being
+        forced non-empty; `_fmt_kv`'s own 1-space-minimum fallback is the
+        last resort for the (unreachable in practice) case where
+        `value_str` alone is as wide as the whole column.
+        """
+        full_label = f"{label}:"
+        max_label_len = width - len(value_str) - 1  # reserve >=1 space
+        if max_label_len <= 0:
+            return ""
+        if len(full_label) <= max_label_len:
+            return full_label
+        if max_label_len == 1:
+            return full_label[:1]
+        return full_label[: max_label_len - 1] + "…"
+
     def render_bottom_section(
         self,
         pacemaker_status,
@@ -1315,10 +1345,12 @@ class UsageRenderer:
             # Get categories from stats (excluding Total)
             for category, count in blockage_stats.items():
                 if category != "Total":
+                    value_str = str(count)
+                    label = self._truncate_blockage_label(
+                        category, value_str, blockage_col_width
+                    )
                     right_lines.append(
-                        self._fmt_kv(
-                            f"{category}:", str(count), str(count), blockage_col_width
-                        )
+                        self._fmt_kv(label, value_str, value_str, blockage_col_width)
                     )
 
             total = blockage_stats.get("Total", 0)

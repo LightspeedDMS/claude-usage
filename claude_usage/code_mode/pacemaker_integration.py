@@ -57,7 +57,7 @@ KNOWN_BLOCKAGE_CATEGORIES = [
     ("intent_validation_dangerbash", "Danger Bash"),
     ("intent_validation_bug", "Bug Detected"),
     ("intent_validation_deferred", "IV Deferred"),
-    ("intent_validation_reviewer_unavailable", "Reviewer Unavailable"),
+    ("intent_validation_reviewer_unavailable", "Reviewer Unavail."),
     ("pacing_tempo", "Pacing Tempo"),
     ("pacing_quota", "Pacing Quota"),
     ("other", "Other"),

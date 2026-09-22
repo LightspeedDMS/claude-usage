@@ -217,13 +217,39 @@ class TestRenderBottomSectionLeftColumn:
 # ===========================================================================
 
 
+class TestBlockageRowTruncationHelper:
+    """Unit coverage for _truncate_blockage_label() (code review, commit 53fb2c2):
+    a label long enough to overflow the 21-char blockage column must be
+    truncated with an ellipsis so the row's label+colon+space+value never
+    exceeds the column width — this is what prevents misalignment/wrapping.
+    """
+
+    def setup_method(self):
+        self.r = UsageRenderer()
+
+    def test_short_label_returned_unchanged_with_colon(self):
+        result = self.r._truncate_blockage_label("Clean Code", "39", width=21)
+        assert result == "Clean Code:"
+
+    def test_boundary_label_with_3digit_value_gets_ellipsis(self):
+        result = self.r._truncate_blockage_label("Reviewer Unavail.", "123", width=21)
+        assert result.endswith("…")
+        assert len(result) + 1 + len("123") <= 21
+
+    def test_very_long_unknown_label_gets_ellipsis(self):
+        long_label = "Some Really Long Unknown Category Name"
+        result = self.r._truncate_blockage_label(long_label, "7", width=21)
+        assert result.endswith("…")
+        assert len(result) + 1 + len("7") <= 21
+
+
 class TestRenderBottomSectionBlockages:
     def setup_method(self):
         self.r = UsageRenderer()
 
-    def _render(self, pm, blockage_stats, **kwargs):
+    def _render(self, pm, blockage_stats, width=120, **kwargs):
         return _render_to_str(
-            self.r.render_bottom_section(pm, blockage_stats, **kwargs)
+            self.r.render_bottom_section(pm, blockage_stats, **kwargs), width=width
         )
 
     def test_blockages_header_present(self):
@@ -250,6 +276,64 @@ class TestRenderBottomSectionBlockages:
         # An empty dict is falsy, so the code takes the else branch: "(unavailable)"
         rendered = self._render(_make_pacemaker_status(), blockage_stats={})
         assert "unavailable" in rendered
+
+    def test_reviewer_unavail_row_value_aligned_two_column(self):
+        """Code review (commit 53fb2c2): "Reviewer Unavailable:" was
+        exactly 21 chars = blockage_col_width, collapsing _fmt_kv's
+        padding to a 1-space fallback and misaligning the value column
+        relative to other rows. Both composed rows must total exactly 21
+        chars (label+padding+value), matching _fmt_kv's normal alignment.
+        """
+        stats = {"Clean Code": 39, "Reviewer Unavail.": 0, "Total": 39}
+        rendered = self._render(_make_pacemaker_status(), stats)
+        assert "Clean Code:        39" in rendered
+        assert "Reviewer Unavail.:  0" in rendered
+
+    def test_reviewer_unavail_3digit_row_ellipsis_and_aligned_two_column(self):
+        """A 3-digit count leaves no room for the full 18-char
+        "Reviewer Unavail.:" label within the 21-char column — it must
+        truncate with an ellipsis rather than overflow."""
+        stats = {"Reviewer Unavail.": 123, "Total": 123}
+        rendered = self._render(_make_pacemaker_status(), stats)
+        assert self._segment_on_one_line("Reviewer Unavail… 123", rendered)
+
+    def test_reviewer_unavail_row_no_wrap_single_column_width(self):
+        """At the review-flagged narrow threshold (~51 cols), the
+        3-digit reviewer-unavailable row must still render on one
+        unbroken line, not wrap across two."""
+        stats = {"Reviewer Unavail.": 123, "Total": 123}
+        rendered = self._render(_make_pacemaker_status(), stats, width=51)
+        assert self._segment_on_one_line("Reviewer Unavail… 123", rendered)
+
+    def test_long_unknown_category_row_no_wrap_single_column_width(self):
+        """Same long-unknown-category truncation, but at the narrow
+        ~51-col width explicitly called out in code review — must stay
+        on one line, not wrap."""
+        long_label = "Some Really Long Unknown Category Name"
+        stats = {long_label: 7, "Total": 7}
+        rendered = self._render(_make_pacemaker_status(), stats, width=51)
+        assert self._segment_on_one_line("Some Really Long U… 7", rendered)
+        assert long_label not in rendered
+
+    @staticmethod
+    def _segment_on_one_line(segment, rendered):
+        """True iff `segment` (which itself contains no newline) appears
+        fully within a single line of `rendered` — proving the row is not
+        wrapped across two output lines, not just present somewhere in
+        the whole multi-line blob."""
+        return any(segment in line for line in rendered.splitlines())
+
+    def test_long_unknown_category_row_ellipsis_and_no_wrap_two_column(self):
+        """A category humanized from an unrecognized DB value (see
+        _humanize_blockage_category) can be arbitrarily long; it must be
+        truncated with an ellipsis rather than wrapping the row."""
+        long_label = "Some Really Long Unknown Category Name"
+        stats = {long_label: 7, "Total": 7}
+        rendered = self._render(_make_pacemaker_status(), stats)
+        assert "Some Really Long U… 7" in rendered
+        # Sanity: the untruncated label must NOT appear anywhere (proves
+        # truncation happened, not an accidental line-length coincidence).
+        assert long_label not in rendered
 
 
 # ===========================================================================

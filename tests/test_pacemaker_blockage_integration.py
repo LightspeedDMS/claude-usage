@@ -528,7 +528,16 @@ class TestBlockageStatsIssue7KnownExtraLabels(_Issue7BlockageTestBase):
         result = self.reader.get_blockage_stats_with_labels()
         self.assertEqual(result["Bug Detected"], 1)
         self.assertEqual(result["IV Deferred"], 1)
-        self.assertEqual(result["Reviewer Unavailable"], 1)
+        self.assertEqual(result["Reviewer Unavail."], 1)
+
+    def test_reviewer_unavail_label_fits_panel_column_width(self):
+        """Label+colon must leave room for a 3-digit value in the 21-char
+        blockage column (display.py's blockage_col_width) — "Reviewer
+        Unavailable" is exactly 21 chars and collapses _fmt_kv's padding
+        to 1, misaligning the value column (code review, commit 53fb2c2)."""
+        blockage_col_width = 21
+        label = "Reviewer Unavail."
+        self.assertLessEqual(len(label) + 1 + 3, blockage_col_width)
 
     def test_empty_db_zero_fills_full_known_list(self):
         """With no events at all, every known category (10 total) is present at 0."""
@@ -613,6 +622,49 @@ class TestBlockageStatsIssue7CachedVariant(_Issue7BlockageTestBase):
         self.assertEqual(result["intent_validation_bug"], 1)
         self.assertEqual(result["some_brand_new_category"], 1)
         self.assertEqual(result["total"], 2)
+
+
+class TestBlockageStatsIssue7ConnectionCleanup(_Issue7BlockageTestBase):
+    """Real-SQLite regression (no mocks): a failed query (blockage_events
+    table missing) must not leave the connection in a state that blocks
+    subsequent real usage of the same DB file — the try/finally added in
+    commit 53fb2c2's Pattern B fix.
+    """
+
+    def test_missing_table_returns_none_and_leaves_db_usable(self):
+        # Recreate the DB file WITHOUT the blockage_events table, so the
+        # query inside _fetch_blockage_rows() raises
+        # sqlite3.OperationalError, exercising the exception path through
+        # the try/finally.
+        self.assertTrue(os.path.exists(self.db_path))
+        os.remove(self.db_path)
+        self.assertFalse(os.path.exists(self.db_path))
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("CREATE TABLE unrelated (id INTEGER)")
+            conn.commit()
+
+        result = self.reader.get_blockage_stats()
+        self.assertIsNone(result)
+
+        # A fresh, independent connection must be able to write to the
+        # SAME file right away, with a short timeout — if the failed call
+        # had leaked an open transaction/lock, this would raise
+        # "database is locked" instead of succeeding.
+        with sqlite3.connect(self.db_path, timeout=1.0) as verify_conn:
+            verify_conn.execute(
+                "CREATE TABLE blockage_events ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp INTEGER, "
+                "category TEXT, reason TEXT, hook_type TEXT, "
+                "session_id TEXT)"
+            )
+            verify_conn.commit()
+
+        # And the reader itself must now succeed normally against the
+        # same underlying file — proving the earlier failed call left no
+        # stale state on the PaceMakerReader instance either.
+        _insert_blockage_event(self.db_path, "intent_validation", minutes_ago=5)
+        result2 = self.reader.get_blockage_stats()
+        self.assertEqual(result2["intent_validation"], 1)
 
 
 if __name__ == "__main__":
