@@ -1444,7 +1444,13 @@ class UsageRenderer:
         Returns:
             Rich Text renderable with event feed
         """
-        _ICON_MAP = {"IV": "\u2716", "TD": "\u26a0", "CC": "\u27e1"}
+        _ICON_MAP = {
+            "IV": "\u2716",
+            "TD": "\u26a0",
+            "CC": "\u27e1",
+            "RS": "\u2713",  # check mark \u2014 reasoning-summary intent approval
+            "DG": "\u26a1",  # high voltage \u2014 degraded review (verifier unavailable)
+        }
         separator = "\u2500" * available_width
 
         if not events:
@@ -1599,7 +1605,13 @@ class UsageRenderer:
 # Activity event groups: each tuple is a visual group separated by spaces.
 # Within a group, codes are separated by dots (·).
 _ACTIVITY_GROUPS = [
-    ("IV", "TD", "CC"),  # PreToolUse: intent, TDD, clean code
+    (
+        "IV",
+        "TD",
+        "CC",
+        "RS",
+        "DG",
+    ),  # PreToolUse: intent, TDD, clean code, reasoning-summary approval, degraded review
     ("ST", "CX"),  # Stop: stop hook, context exhaustion
     ("PA", "PL"),  # Pacing: pacing decision, API poll
     ("LF",),  # PostToolUse: Langfuse push
@@ -1612,6 +1624,7 @@ _STATUS_STYLES = {
     "green": "bold green",
     "red": "bold red",
     "blue": "bold blue",
+    "yellow": "bold yellow",
 }
 _IDLE_STYLE = "dim"
 
@@ -1623,7 +1636,7 @@ def render_activity_line(events: list) -> "Text":
     and spaces between groups. Active events are colored by status;
     inactive codes shown dim.
 
-    Visual: ▸ IV·TD·CC ST·CX PA·PL LF SS·SM SE·SA·UP
+    Visual: ▸ IV·TD·CC·RS·DG ST·CX PA·PL LF SS·SM SE·SA·UP
 
     Args:
         events: List of dicts with 'event_code' and 'status' keys,

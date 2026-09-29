@@ -4,7 +4,12 @@ Tests the real rendering code with no mocks.  Input is a plain list of
 event dicts; output is inspected via .plain and ._spans on the returned
 Rich Text object.
 
-Groups spec: IV·TD·CC ST·CX PA·PL LF SS·SM SE·SA·UP  (13 codes total)
+Groups spec: IV·TD·CC·RS·DG ST·CX PA·PL LF SS·SM SE·SA·UP  (15 codes total)
+
+RS/DG were added by claude-pace-maker issue #151/#131 (this monitor's issue
+#8): RS = reasoning-summary intent approval, DG = degraded review (a
+verifier failed to respond). Both live in the first (PreToolUse) group,
+next to the pre-existing intent-validation indicators.
 """
 
 from __future__ import annotations
@@ -21,6 +26,8 @@ ALL_CODES = [
     "IV",
     "TD",
     "CC",
+    "RS",
+    "DG",
     "ST",
     "CX",
     "PA",
@@ -193,11 +200,14 @@ class TestRenderActivityLineGroupSeparators:
         assert f"SE{DOT}SA{DOT}UP" in plain
 
     def test_space_between_group_1_and_2(self):
-        """After CC (end of group 1) there should be a space before ST."""
-        assert "CC ST" in render_activity_line([]).plain
+        """After DG (end of group 1, now including RS/DG) there should be a space before ST."""
+        assert "DG ST" in render_activity_line([]).plain
 
     def test_full_canonical_layout(self):
-        expected = f"{ARROW} IV{DOT}TD{DOT}CC ST{DOT}CX PA{DOT}PL LF SS{DOT}SM SE{DOT}SA{DOT}UP"
+        expected = (
+            f"{ARROW} IV{DOT}TD{DOT}CC{DOT}RS{DOT}DG ST{DOT}CX PA{DOT}PL LF "
+            f"SS{DOT}SM SE{DOT}SA{DOT}UP"
+        )
         assert expected in render_activity_line([]).plain
 
 

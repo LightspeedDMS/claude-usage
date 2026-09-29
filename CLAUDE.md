@@ -101,6 +101,22 @@ The governance event feed displays reviewer identity extracted from `[REVIEWER:x
 - **`[Gem]`**: Cyan — indicates Gemini was the reviewing model
 - **No tag**: Legacy events without reviewer identity display normally (backwards compatible)
 
+---
+
+## RS/DG Activity & Governance Indicators (issue #8)
+
+pace-maker 2.36.x added two activity/governance event codes on top of the pre-existing `IV`/`TD`/`CC` PreToolUse trio:
+
+- **`RS`** — Reasoning-Summary intent exception (claude-pace-maker issue #151): an APPROVED verdict reached via a reasoning-summary or visible-text intent source rather than a formal `INTENT:` declaration. Recorded with activity status `"green"`.
+- **`DG`** — Degraded review (claude-pace-maker issue #131): an APPROVED verdict where one or more verifiers failed to respond. Recorded with activity status `"yellow"`.
+
+Both are wired in `display.py`:
+- `_ACTIVITY_GROUPS`'s first tuple is `("IV", "TD", "CC", "RS", "DG")` — RS/DG sit next to the intent-validation indicators on the activity line (`▸ IV·TD·CC·RS·DG ST·CX ...`).
+- `_STATUS_STYLES` has a `"yellow": "bold yellow"` entry (previously only green/red/blue existed) so an active DG event renders distinctly instead of falling back to dim.
+- `render_event_feed()`'s `_ICON_MAP` maps `RS` → `✓` (check mark) and `DG` → `⚡` (high voltage), so governance events of these types no longer render the `"?"` fallback icon.
+
+See `tests/test_issue_8_rs_dg_indicators.py` for the regression coverage.
+
 Reviewer tag extraction uses the `_REVIEWER_TAG_RE` regex pattern in `display.py`, matching against the `REVIEWER_TAGS` lookup dict.
 
 ---
