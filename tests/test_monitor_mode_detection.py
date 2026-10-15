@@ -170,14 +170,18 @@ class TestModeDetection(unittest.TestCase):
     def test_detect_mode_error_when_no_credentials(self):
         """Test that mode detection returns error when no credentials found"""
         # Don't create credentials file and use empty fake home (no ~/.claude.json)
-        with patch.dict(os.environ, {}, clear=True):
-            with patch("claude_usage.monitor.Path.home", return_value=self.fake_home):
-                monitor = ClaudeUsageMonitor(credentials_path=self.credentials_path)
-                mode = monitor.detect_mode()
+        # Linux: never consult the developer's real macOS Keychain
+        with patch("platform.system", return_value="Linux"):
+            with patch.dict(os.environ, {}, clear=True):
+                with patch(
+                    "claude_usage.monitor.Path.home", return_value=self.fake_home
+                ):
+                    monitor = ClaudeUsageMonitor(credentials_path=self.credentials_path)
+                    mode = monitor.detect_mode()
 
-                self.assertIsNone(mode)
-                self.assertIsNotNone(monitor.error_message)
-                self.assertIn("No credentials", monitor.error_message)
+                    self.assertIsNone(mode)
+                    self.assertIsNotNone(monitor.error_message)
+                    self.assertIn("No credentials", monitor.error_message)
 
     def test_mode_field_override_in_credentials_forces_console(self):
         """

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.19.6] - 2026-10-15
+
+### Fixed
+- **macOS: stale credentials file beat the Keychain after a Claude account switch (#10).** On Darwin the Keychain is now the source of truth and `~/.claude/.credentials.json` is only a cache, used (with a logged warning) solely when the Keychain read fails; the file is rewritten whenever the Keychain differs (`accessToken`, `subscriptionType`, `rateLimitTier`). Linux is unchanged. (`claude_usage/code_mode/auth.py`)
+- **Credentials are re-resolved on every poll cycle**, including when pace-maker's UsageModel supplies the usage data. When the access token changes, the cached profile is dropped and fetched again so the tier display follows the new account. (`claude_usage/code_mode/monitor.py`)
+- **Pace-maker `profile_cache.json` fallback is validated**: ignored when older than 24h (`CodeMonitor.PROFILE_CACHE_MAX_AGE_SECONDS`) or when its `token_fingerprint` (first 16 hex of sha256 of the access token) differs from the current token. Caches without the key are age-checked only.
+- **The Keychain read times out after 3s** (`KEYCHAIN_TIMEOUT_SECONDS`), so an open Keychain prompt can no longer freeze the monitor; on timeout it falls back to the file with a warning. (`claude_usage/code_mode/auth.py`)
+- **`~/.claude/.credentials.json` is written atomically with mode 0600** (temp file in the same directory, then `os.replace`), so the token file is no longer world-readable. (`claude_usage/code_mode/auth.py`)
+
 ## [2.19.0] - 2026-06-18
 
 ### Added

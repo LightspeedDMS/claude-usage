@@ -116,13 +116,16 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
             mock_fetch.return_value = (self.mock_usage_response, None)
 
-            # Mock Keychain to ensure it's not called (file has valid token)
+            # Keychain is consulted first (issue #10); it fails here, so the
+            # valid file token is the fallback
             with patch.object(
-                monitor.oauth_manager, "extract_from_macos_keychain"
+                monitor.oauth_manager,
+                "extract_from_macos_keychain",
+                return_value=(None, "Not found"),
             ) as mock_keychain:
                 success = monitor.fetch_usage()
 
-            mock_keychain.assert_not_called()
+            mock_keychain.assert_called()
 
         # Should succeed after reloading from file
         self.assertTrue(success)
@@ -260,8 +263,8 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
         self.assertIsNone(monitor.error_message)
         self.assertEqual(monitor.credentials["accessToken"], "valid-access-token")
         self.assertIsNotNone(monitor.last_usage)
-        # Only initial load in __init__, no reload during fetch_usage
-        self.assertEqual(load_call_count[0], 0)
+        # Credentials are re-resolved exactly once per poll cycle (issue #10)
+        self.assertEqual(load_call_count[0], 1)
 
     @patch("platform.system", return_value="Darwin")
     def test_fetch_usage_updates_credentials_in_memory_after_reload(
@@ -388,13 +391,12 @@ class TestCodeMonitorTokenRefresh(unittest.TestCase):
             with patch.object(monitor.api_client, "fetch_usage") as mock_fetch:
                 mock_fetch.return_value = (self.mock_usage_response, None)
 
-                # First call - should reload from Keychain
+                # Each poll cycle re-resolves credentials from the Keychain
                 success1 = monitor.fetch_usage()
-                # Second call - should use reloaded token without calling Keychain again
                 success2 = monitor.fetch_usage()
 
-            # Keychain should only be called once (during first reload)
-            self.assertEqual(mock_keychain.call_count, 1)
+            # Keychain is read once per poll cycle (issue #10)
+            self.assertEqual(mock_keychain.call_count, 2)
 
         # Both calls should succeed
         self.assertTrue(success1)

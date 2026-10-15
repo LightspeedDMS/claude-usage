@@ -313,7 +313,7 @@ class TestCodeMonitorPacemakerBackoff(unittest.TestCase):
             monitor.org_uuid = None
             monitor.account_uuid = None
             monitor.last_usage = None
-            monitor.last_profile = None
+            monitor.last_profile = {"organization": {}}
             monitor.last_update = None
             monitor.error_message = None
             monitor.api_client = MagicMock()
@@ -321,6 +321,10 @@ class TestCodeMonitorPacemakerBackoff(unittest.TestCase):
             monitor.pacemaker_reader = MagicMock()
             monitor.pacemaker_reader.is_installed.return_value = False
             monitor.oauth_manager.is_token_expired.return_value = False
+            monitor.oauth_manager.load_credentials.return_value = (
+                monitor.credentials,
+                None,
+            )
             monitor.oauth_manager.get_auth_headers.return_value = {
                 "Authorization": "Bearer test"
             }

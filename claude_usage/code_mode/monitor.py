@@ -10,7 +10,7 @@ from rich.live import Live
 from rich.console import Console, Group
 from rich.text import Text
 
-from .auth import OAuthManager
+from .auth import OAuthManager, token_fingerprint
 from .api import ClaudeAPIClient
 from .storage import CodeStorage, CodeAnalytics
 from .display import UsageRenderer
@@ -26,6 +26,8 @@ class CodeMonitor:
     POLL_INTERVAL = 300  # seconds between API calls (5 minutes — same as pace-maker)
     DISPLAY_REFRESH_INTERVAL = 1  # seconds between display refreshes
     CACHE_FRESHNESS_SECONDS = 360  # slightly above poll interval
+    # ignore older pace-maker profile cache
+    PROFILE_CACHE_MAX_AGE_SECONDS = 24 * 60 * 60
 
     def __init__(self, credentials_path=None):
         if credentials_path is None:
@@ -68,6 +70,22 @@ class CodeMonitor:
         self.credentials, error = self.oauth_manager.load_credentials()
         if error:
             self.error_message = error
+
+    def _credentials_fingerprint(self):
+        """Fingerprint of the current accessToken, or None without credentials."""
+        if not self.credentials or not self.credentials.get("accessToken"):
+            return None
+        return token_fingerprint(self.credentials["accessToken"])
+
+    def _refresh_credentials(self):
+        """Reload credentials; if the account changed, drop and refetch the profile."""
+        old_fingerprint = self._credentials_fingerprint()
+        self._load_credentials()
+        new_fingerprint = self._credentials_fingerprint()
+        if new_fingerprint is not None and new_fingerprint != old_fingerprint:
+            self.last_profile = None
+            self.org_uuid = None
+            self.account_uuid = None
 
     def _refresh_from_model(self):
         """Lightweight read from UsageModel — just a SQLite query, no API call.
@@ -151,26 +169,23 @@ class CodeMonitor:
         Called every POLL_INTERVAL (300s). When UsageModel is available,
         _refresh_from_model() in the display loop provides data every cycle.
         """
+        # Re-resolve credentials every cycle: the Claude account may have switched
+        self._refresh_credentials()
+
+        # No profile (account just switched, or the last fetch failed): try again
+        if self.last_profile is None and self.credentials:
+            self.fetch_profile()
+
         # Try UsageModel first (cheap SQLite read)
         if self._refresh_from_model():
             return True
 
-        # Check if we need to reload credentials
-        if not self.credentials:
-            self._load_credentials()
-
         if not self.credentials:
             return False
 
-        # Check token expiry and reload from file/Keychain if needed
+        # Still expired after the reload above - nothing usable
         if self.oauth_manager.is_token_expired(self.credentials):
-            self._load_credentials()
-
-            # After reload, check if we still have expired token or no credentials
-            if not self.credentials or self.oauth_manager.is_token_expired(
-                self.credentials
-            ):
-                return False
+            return False
 
         # Detect pace-maker backoff via UsageModel (SQLite — single source of truth)
         pacemaker_in_backoff = False
@@ -248,6 +263,10 @@ class CodeMonitor:
     def _load_profile_cache(self):
         """Load profile from pace-maker's profile_cache.json as fallback.
 
+        The cache is ignored when older than PROFILE_CACHE_MAX_AGE_SECONDS (or
+        undated) or when its "token_fingerprint" belongs to a different token
+        than the current one. A cache without the key is age-checked only.
+
         Returns profile dict or None if unavailable.
         """
         try:
@@ -255,8 +274,23 @@ class CodeMonitor:
             if not cache_path.exists():
                 return None
             data = json.loads(cache_path.read_text().strip())
+
+            timestamp = data.get("timestamp")
+            if not isinstance(timestamp, (int, float)):
+                return None
+            if time.time() - timestamp > self.PROFILE_CACHE_MAX_AGE_SECONDS:
+                return None
+
+            cached_fingerprint = data.get("token_fingerprint")
+            if (
+                cached_fingerprint is not None
+                and cached_fingerprint != self._credentials_fingerprint()
+            ):
+                return None
+
             return data.get("profile")
-        except Exception:
+        except Exception as e:
+            logging.debug(f"Ignoring pace-maker profile cache: {type(e).__name__}: {e}")
             return None
 
     def get_display(self):
